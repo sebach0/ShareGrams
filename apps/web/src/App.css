@@ -1,0 +1,316 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-layout__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #e2e2e2;
+  background: #fafafa;
+}
+
+.toolbar__brand {
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.toolbar button {
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+.toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.diagram-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.uml-class-node {
+  min-width: 160px;
+  border: 1.5px solid #333;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.uml-class-node.is-selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
+.uml-class-node__header {
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+}
+
+.uml-class-node__attributes {
+  padding: 6px 8px;
+  min-height: 20px;
+}
+
+.uml-class-node__attribute {
+  white-space: nowrap;
+}
+
+.uml-class-node__empty {
+  color: #999;
+  font-style: italic;
+}
+
+.uml-edge-label {
+  position: absolute;
+  background: #fff;
+  padding: 0 4px;
+  font-size: 11px;
+  pointer-events: none;
+  border-radius: 3px;
+}
+
+.uml-edge-label--center {
+  font-weight: 600;
+  color: #444;
+}
+
+.inspector {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid #e2e2e2;
+  padding: 1rem;
+  overflow-y: auto;
+  background: #fcfcfc;
+}
+
+.inspector--empty {
+  color: #999;
+  font-style: italic;
+}
+
+.inspector h3 {
+  margin-top: 0;
+}
+
+.inspector__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 13px;
+}
+
+.inspector__field input,
+.inspector__field select {
+  padding: 0.3rem;
+}
+
+.inspector__attribute-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inspector__attribute-row {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.inspector__attribute-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspector__new-attribute {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.inspector__new-attribute input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inspector__relationship-summary {
+  font-weight: 600;
+}
+
+.inspector__relationship-type {
+  color: #666;
+  font-size: 12px;
+  margin-top: -0.5rem;
+}
+
+.inspector__error {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.auth-page {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: 320px;
+  padding: 2rem;
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+}
+
+.auth-form h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+}
+
+.auth-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 13px;
+}
+
+.auth-form__field input {
+  padding: 0.5rem;
+}
+
+.auth-form__error {
+  color: #b91c1c;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-form__hint {
+  font-size: 13px;
+  text-align: center;
+  margin: 0;
+}
+
+.projects-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.projects-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.projects-page__user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 13px;
+}
+
+.projects-page__create {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.projects-page__create input {
+  flex: 1;
+  padding: 0.5rem;
+}
+
+.projects-page__error {
+  color: #b91c1c;
+}
+
+.projects-page__empty {
+  color: #666;
+  font-style: italic;
+}
+
+.projects-page__list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.projects-page__project {
+  padding: 1rem;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+}
+
+.projects-page__diagrams {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.editor-page__status {
+  padding: 2rem;
+  text-align: center;
+}
+
+.editor-page__status--error {
+  color: #b91c1c;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #e2e2e2;
+  background: #f0f0f0;
+  font-size: 13px;
+}
+
+.editor-header__name {
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.editor-header__status {
+  font-weight: 600;
+}
+
+.editor-header__status::before {
+  content: '●';
+  margin-right: 0.35rem;
+}
+
+.editor-header__status--connected {
+  color: #15803d;
+}
+
+.editor-header__status--connecting {
+  color: #b45309;
+}
+
+.editor-header__status--disconnected {
+  color: #b91c1c;
+}

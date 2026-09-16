@@ -1,0 +1,37 @@
+import type { UMLModel } from '@sharegrams/uml-core';
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+export interface AuthResult {
+  accessToken: string;
+  user: PublicUser;
+}
+
+export interface DiagramSummary {
+  id: string;
+  name: string;
+  updatedAt: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+  diagrams: DiagramSummary[];
+}
+
+export interface DiagramDetail {
+  id: string;
+  projectId: string;
+  name: string;
+  model: UMLModel;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
