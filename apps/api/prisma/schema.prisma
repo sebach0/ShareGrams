@@ -8,22 +8,44 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime  @default(now())
-  projects     Project[]
+  id                 String          @id @default(uuid())
+  email              String          @unique
+  passwordHash       String
+  name               String?
+  createdAt          DateTime        @default(now())
+  projects           Project[]
+  projectMemberships ProjectMember[]
 }
 
 model Project {
-  id        String    @id @default(uuid())
+  id        String          @id @default(uuid())
   name      String
   ownerId   String
-  owner     User      @relation(fields: [ownerId], references: [id])
+  owner     User            @relation(fields: [ownerId], references: [id])
   diagrams  Diagram[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  members   ProjectMember[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+enum ProjectRole {
+  EDITOR
+  VIEWER
+}
+
+/// El dueño (Project.ownerId) no tiene fila acá: es un nivel de acceso
+/// implícito por encima de EDITOR/VIEWER. Esta tabla es exclusivamente
+/// para colaboradores invitados.
+model ProjectMember {
+  id        String      @id @default(uuid())
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectRole
+  createdAt DateTime    @default(now())
+
+  @@unique([projectId, userId])
 }
 
 /// El campo `model` guarda el UMLModel completo (classes + relationships)

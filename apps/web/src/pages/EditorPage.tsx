@@ -4,12 +4,13 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { DiagramCanvas } from '../components/canvas/DiagramCanvas';
 import { Inspector } from '../components/panels/Inspector';
 import { Toolbar } from '../components/panels/Toolbar';
+import { ShareDialog } from '../components/share/ShareDialog';
 import { useUmlStore } from '../store/useUmlStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { getDiagram } from '../api/diagrams';
 import { ApiError } from '../api/client';
 import { CollabProvider } from '../realtime/CollabProvider';
-import { useCollabStatus } from '../realtime/collabContext';
+import { useCollabRole, useCollabStatus } from '../realtime/collabContext';
 import '../App.css';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -32,8 +33,10 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
   const syncSavedModel = useUmlStore((s) => s.syncSavedModel);
 
   const [diagramName, setDiagramName] = useState('');
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!diagramId || !token) return;
@@ -44,6 +47,7 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
         if (cancelled) return;
         loadModel(diagram.model);
         setDiagramName(diagram.name);
+        setProjectId(diagram.projectId);
         setLoadStatus('ready');
       })
       .catch((err) => {
@@ -69,18 +73,27 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
       });
   }, [diagramId, token, syncSavedModel]);
 
+  const handleAccessRevoked = useCallback(() => {
+    navigate('/projects', { state: { message: 'El dueño del proyecto te quitó el acceso a este diagrama.' } });
+  }, [navigate]);
+
   if (loadStatus === 'loading') {
     return <p className="editor-page__status">Cargando diagrama…</p>;
   }
   if (loadStatus === 'error') {
     return <p className="editor-page__status editor-page__status--error">{loadError}</p>;
   }
-  if (!diagramId || !token) {
+  if (!diagramId || !token || !projectId) {
     return null;
   }
 
   return (
-    <CollabProvider diagramId={diagramId} token={token} onOutOfSync={resync}>
+    <CollabProvider
+      diagramId={diagramId}
+      token={token}
+      onOutOfSync={resync}
+      onAccessRevoked={handleAccessRevoked}
+    >
       <ReactFlowProvider>
         <div className="app-layout">
           <header className="editor-header">
@@ -88,7 +101,9 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
               ← Proyectos
             </button>
             <span className="editor-header__name">{diagramName}</span>
+            <RoleBadge />
             <ConnectionBadge />
+            <ShareButton onOpen={() => setShareOpen(true)} />
           </header>
           <Toolbar />
           <div className="app-layout__body">
@@ -97,6 +112,7 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
           </div>
         </div>
       </ReactFlowProvider>
+      {shareOpen && <ShareDialog projectId={projectId} onClose={() => setShareOpen(false)} />}
     </CollabProvider>
   );
 }
@@ -110,4 +126,26 @@ const STATUS_LABEL: Record<ReturnType<typeof useCollabStatus>, string> = {
 function ConnectionBadge() {
   const status = useCollabStatus();
   return <span className={`editor-header__status editor-header__status--${status}`}>{STATUS_LABEL[status]}</span>;
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  OWNER: 'Dueño',
+  EDITOR: 'Editor',
+  VIEWER: 'Solo lectura',
+};
+
+function RoleBadge() {
+  const role = useCollabRole();
+  if (!role || role === 'OWNER') return null;
+  return <span className="editor-header__role">{ROLE_LABEL[role]}</span>;
+}
+
+function ShareButton({ onOpen }: { onOpen: () => void }) {
+  const role = useCollabRole();
+  if (role !== 'OWNER') return null;
+  return (
+    <button type="button" onClick={onOpen}>
+      Compartir
+    </button>
+  );
 }

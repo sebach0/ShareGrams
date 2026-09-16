@@ -1,36 +1,54 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { applyCommand, validateModel } from '@sharegrams/uml-core';
 import type { Command, CommandError, UMLModel } from '@sharegrams/uml-core';
 import { PrismaService } from '../prisma/prisma.service';
 import { toJsonValue } from '../prisma/json.util';
+import { ProjectsService } from '../projects/projects.service';
 
 const MAX_APPLY_RETRIES = 5;
 
 export type ApplyCommandResult =
   | { ok: true; model: UMLModel; version: number }
   | { ok: false; reason: 'invalid'; error: CommandError }
-  | { ok: false; reason: 'conflict' };
+  | { ok: false; reason: 'conflict' }
+  | { ok: false; reason: 'read_only' };
 
 /**
- * Un diagrama es compartido "por link": cualquier usuario autenticado que
- * conozca su id (un UUID, no adivinable) puede verlo y editarlo. No hay
- * concepto de dueño exclusivo a este nivel -- eso sigue existiendo para
- * Project (quién lo ve en "Mis proyectos", quién puede borrarlo), pero un
- * diagrama puntual es, a propósito, tan abierto como una pizarra colaborativa.
+ * Un diagrama se comparte por link entre cualquier usuario que tenga acceso
+ * al proyecto dueño (como dueño, EDITOR o VIEWER -- ver ProjectsService). No
+ * hay ownership propio a nivel diagrama: la autorización siempre pasa por el
+ * proyecto. VIEWER puede leer pero no mutar.
  */
 @Injectable()
 export class DiagramsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectsService: ProjectsService,
+  ) {}
 
-  async getById(diagramId: string) {
+  private async loadWithAccess(diagramId: string, userId: string) {
     const diagram = await this.prisma.diagram.findUnique({ where: { id: diagramId } });
     if (!diagram) {
       throw new NotFoundException('Diagrama no encontrado.');
     }
+    const access = await this.projectsService.getAccessLevel(diagram.projectId, userId);
+    if (!access) {
+      throw new ForbiddenException('No tenés acceso a este diagrama.');
+    }
+    return { diagram, access };
+  }
+
+  async getById(diagramId: string, userId: string) {
+    const { diagram } = await this.loadWithAccess(diagramId, userId);
     return diagram;
   }
 
-  async save(diagramId: string, model: UMLModel) {
+  /** Igual que getById, pero además informa el rol del usuario (lo necesita el gateway para el modo solo-lectura). */
+  async getByIdWithAccess(diagramId: string, userId: string) {
+    return this.loadWithAccess(diagramId, userId);
+  }
+
+  async save(diagramId: string, userId: string, model: UMLModel) {
     const errors = validateModel(model);
     if (errors.length > 0) {
       throw new BadRequestException({
@@ -39,7 +57,10 @@ export class DiagramsService {
       });
     }
 
-    await this.getById(diagramId); // 404 si no existe
+    const { access } = await this.loadWithAccess(diagramId, userId);
+    if (access === 'VIEWER') {
+      throw new ForbiddenException('Tu rol en este proyecto es de solo lectura.');
+    }
 
     return this.prisma.diagram.update({
       where: { id: diagramId },
@@ -58,11 +79,14 @@ export class DiagramsService {
    * el diagrama mientras tanto (bloqueo optimista vía `version`). Si alguien
    * se adelantó, reintenta contra el estado más nuevo en vez de pisarlo.
    */
-  async applyCommandToDiagram(diagramId: string, command: Command): Promise<ApplyCommandResult> {
+  async applyCommandToDiagram(diagramId: string, userId: string, command: Command): Promise<ApplyCommandResult> {
     for (let attempt = 0; attempt < MAX_APPLY_RETRIES; attempt += 1) {
-      const diagram = await this.getById(diagramId);
-      const currentModel = diagram.model as unknown as UMLModel;
+      const { diagram, access } = await this.loadWithAccess(diagramId, userId);
+      if (access === 'VIEWER') {
+        return { ok: false, reason: 'read_only' };
+      }
 
+      const currentModel = diagram.model as unknown as UMLModel;
       const result = applyCommand(currentModel, command);
       if (!result.ok) {
         return { ok: false, reason: 'invalid', error: result.error };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { generateId, PRIMITIVE_TYPES } from '@sharegrams/uml-core';
 import type { PrimitiveType, UMLAttribute } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
 
 interface ClassInspectorProps {
   classId: string;
@@ -15,6 +15,7 @@ interface AttributeRowProps {
 
 function AttributeRow({ classId, attribute }: AttributeRowProps) {
   const dispatch = useCollabDispatch();
+  const readOnly = useIsReadOnly();
   const [name, setName] = useState(attribute.name);
   const [attributeType, setAttributeType] = useState<PrimitiveType>(attribute.type);
 
@@ -39,6 +40,7 @@ function AttributeRow({ classId, attribute }: AttributeRowProps) {
         onChange={(e) => setName(e.target.value)}
         onBlur={() => commit()}
         onKeyDown={(e) => e.key === 'Enter' && commit()}
+        disabled={readOnly}
       />
       <select
         value={attributeType}
@@ -47,6 +49,7 @@ function AttributeRow({ classId, attribute }: AttributeRowProps) {
           setAttributeType(value);
           commit({ attributeType: value });
         }}
+        disabled={readOnly}
       >
         {PRIMITIVE_TYPES.map((t) => (
           <option key={t} value={t}>
@@ -58,6 +61,7 @@ function AttributeRow({ classId, attribute }: AttributeRowProps) {
         type="button"
         aria-label="Eliminar atributo"
         onClick={() => dispatch({ type: 'DELETE_ATTRIBUTE', classId, attributeId: attribute.id })}
+        disabled={readOnly}
       >
         ×
       </button>
@@ -68,6 +72,7 @@ function AttributeRow({ classId, attribute }: AttributeRowProps) {
 export function ClassInspector({ classId }: ClassInspectorProps) {
   const umlClass = useUmlStore((s) => s.model.classes.find((c) => c.id === classId));
   const dispatch = useCollabDispatch();
+  const readOnly = useIsReadOnly();
   const lastError = useUmlStore((s) => s.lastError);
 
   const [name, setName] = useState(umlClass?.name ?? '');
@@ -107,6 +112,7 @@ export function ClassInspector({ classId }: ClassInspectorProps) {
           onChange={(e) => setName(e.target.value)}
           onBlur={commitName}
           onKeyDown={(e) => e.key === 'Enter' && commitName()}
+          disabled={readOnly}
         />
       </label>
 
@@ -123,15 +129,20 @@ export function ClassInspector({ classId }: ClassInspectorProps) {
           value={newAttrName}
           onChange={(e) => setNewAttrName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAddAttribute()}
+          disabled={readOnly}
         />
-        <select value={newAttrType} onChange={(e) => setNewAttrType(e.target.value as PrimitiveType)}>
+        <select
+          value={newAttrType}
+          onChange={(e) => setNewAttrType(e.target.value as PrimitiveType)}
+          disabled={readOnly}
+        >
           {PRIMITIVE_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
             </option>
           ))}
         </select>
-        <button type="button" onClick={handleAddAttribute}>
+        <button type="button" onClick={handleAddAttribute} disabled={readOnly}>
           + atributo
         </button>
       </div>

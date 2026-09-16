@@ -4,7 +4,7 @@ import type { EdgeMouseHandler, NodeMouseHandler, OnNodeDrag, OnConnect } from '
 import '@xyflow/react/dist/style.css';
 import { generateId } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
 import { ClassNode } from './ClassNode';
 import type { ClassNodeType } from './ClassNode';
 import { RelationshipEdge } from './RelationshipEdge';
@@ -17,6 +17,7 @@ export function DiagramCanvas() {
   const model = useUmlStore((s) => s.model);
   const selection = useUmlStore((s) => s.selection);
   const dispatch = useCollabDispatch();
+  const readOnly = useIsReadOnly();
   const select = useUmlStore((s) => s.select);
 
   const nodes: ClassNodeType[] = useMemo(
@@ -91,6 +92,8 @@ export function DiagramCanvas() {
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         fitView
       >
         <Background />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Multiplicity } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
 
 interface RelationshipInspectorProps {
   relationshipId: string;
@@ -29,6 +29,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
   const relationship = useUmlStore((s) => s.model.relationships.find((r) => r.id === relationshipId));
   const classes = useUmlStore((s) => s.model.classes);
   const dispatch = useCollabDispatch();
+  const readOnly = useIsReadOnly();
   const select = useUmlStore((s) => s.select);
   const lastError = useUmlStore((s) => s.lastError);
 
@@ -85,6 +86,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
               onBlur={() => commitMultiplicity('source', sourceMultiplicityText)}
               onKeyDown={(e) => e.key === 'Enter' && commitMultiplicity('source', sourceMultiplicityText)}
               placeholder="1, 0..1, 0..*, *"
+              disabled={readOnly}
             />
           </label>
           <label className="inspector__field">
@@ -95,6 +97,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
               onBlur={() => commitMultiplicity('target', targetMultiplicityText)}
               onKeyDown={(e) => e.key === 'Enter' && commitMultiplicity('target', targetMultiplicityText)}
               placeholder="1, 0..1, 0..*, *"
+              disabled={readOnly}
             />
           </label>
         </>
@@ -102,14 +105,24 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
 
       <label className="inspector__field">
         <span>Rol en {sourceClassName}</span>
-        <input value={sourceRole} onChange={(e) => setSourceRole(e.target.value)} onBlur={commitRoles} />
+        <input
+          value={sourceRole}
+          onChange={(e) => setSourceRole(e.target.value)}
+          onBlur={commitRoles}
+          disabled={readOnly}
+        />
       </label>
       <label className="inspector__field">
         <span>Rol en {targetClassName}</span>
-        <input value={targetRole} onChange={(e) => setTargetRole(e.target.value)} onBlur={commitRoles} />
+        <input
+          value={targetRole}
+          onChange={(e) => setTargetRole(e.target.value)}
+          onBlur={commitRoles}
+          disabled={readOnly}
+        />
       </label>
 
-      <button type="button" onClick={handleDelete}>
+      <button type="button" onClick={handleDelete} disabled={readOnly}>
         Eliminar relación
       </button>
 

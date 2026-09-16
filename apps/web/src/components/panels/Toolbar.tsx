@@ -1,6 +1,6 @@
 import { generateId } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
 
 function nextClassName(existingNames: string[]): string {
   const normalized = existingNames.map((n) => n.toLowerCase());
@@ -14,6 +14,7 @@ export function Toolbar() {
   const selection = useUmlStore((s) => s.selection);
   const dispatch = useCollabDispatch();
   const select = useUmlStore((s) => s.select);
+  const readOnly = useIsReadOnly();
 
   const handleAddClass = () => {
     const name = nextClassName(model.classes.map((c) => c.name));
@@ -38,12 +39,13 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <span className="toolbar__brand">ShareGrams</span>
-      <button type="button" onClick={handleAddClass}>
+      <button type="button" onClick={handleAddClass} disabled={readOnly}>
         + Clase
       </button>
-      <button type="button" onClick={handleDeleteSelection} disabled={!selection}>
+      <button type="button" onClick={handleDeleteSelection} disabled={readOnly || !selection}>
         Eliminar seleccionado
       </button>
+      {readOnly && <span className="toolbar__readonly">Solo lectura</span>}
     </header>
   );
 }

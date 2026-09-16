@@ -35,3 +35,15 @@ export interface DiagramDetail {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ProjectRole = 'EDITOR' | 'VIEWER';
+export type AccessLevel = 'OWNER' | ProjectRole;
+
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: ProjectRole;
+  createdAt: string;
+  user: PublicUser;
+}
