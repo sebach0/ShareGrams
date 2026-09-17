@@ -10,13 +10,14 @@ import {
   WebSocketGateway,
 } from '@nestjs/websockets';
 import type { Socket } from 'socket.io';
-import type { Command } from '@sharegrams/uml-core';
+import type { Command, UMLModel } from '@sharegrams/uml-core';
 import type { JwtPayload } from '../auth/auth.service';
 import { DiagramsService } from '../diagrams/diagrams.service';
 import type { ApplyCommandResult } from '../diagrams/diagrams.service';
 import type { AccessLevel } from '../projects/projects.service';
 import { PROJECT_MEMBER_REMOVED, PROJECT_MEMBER_ROLE_CHANGED } from '../projects/project-events';
 import type { ProjectMemberRemovedEvent, ProjectMemberRoleChangedEvent } from '../projects/project-events';
+import { AssistantService } from '../assistant/assistant.service';
 
 interface SocketData {
   user: JwtPayload;
@@ -33,11 +34,35 @@ interface CommandPayload {
   command: Command;
 }
 
+interface AssistantInstructionPayload {
+  diagramId: string;
+  instruction: string;
+}
+
 type JoinDiagramResponse =
   | { ok: true; model: unknown; version: number; role: AccessLevel }
   | { ok: false; reason: 'not_found' };
 
 type CommandResponse = ApplyCommandResult | { ok: false; reason: 'not_joined' } | { ok: false; reason: 'not_found' };
+
+type AssistantInstructionResponse =
+  // commands va acá porque el emisor -- a diferencia de un comando manual -- no los conoce
+  // de antemano (los arma el LLM server-side): los necesita para aplicarlos en su propio canvas.
+  | { ok: true; message: string; version: number; commands: Command[] }
+  | {
+      ok: false;
+      reason:
+        | 'not_joined'
+        | 'not_found'
+        | 'read_only'
+        | 'clarification_needed'
+        | 'unsupported'
+        | 'not_configured'
+        | 'invalid'
+        | 'conflict'
+        | 'error';
+      message: string;
+    };
 
 function roomFor(diagramId: string): string {
   return `diagram:${diagramId}`;
@@ -63,6 +88,7 @@ export class DiagramGateway implements OnGatewayConnection, OnGatewayDisconnect 
   constructor(
     private readonly jwtService: JwtService,
     private readonly diagramsService: DiagramsService,
+    private readonly assistantService: AssistantService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -161,19 +187,87 @@ export class DiagramGateway implements OnGatewayConnection, OnGatewayDisconnect 
     }
 
     try {
-      const result = await this.diagramsService.applyCommandToDiagram(payload.diagramId, data.user.sub, payload.command);
-
-      if (result.ok) {
-        // Al resto de la sala (no al emisor: ya aplicó el comando localmente de forma optimista).
-        client.to(roomFor(payload.diagramId)).emit('remote_command', {
-          command: payload.command,
-          version: result.version,
-        });
-      }
-
-      return result;
+      return await this.applyAndBroadcast(client, payload.diagramId, data.user.sub, payload.command);
     } catch {
       return { ok: false, reason: 'not_found' };
     }
+  }
+
+  /**
+   * El asistente de IA no es un camino de escritura aparte: interpreta la
+   * instrucción a Command(s) (AssistantService, sin acceso a Prisma ni al
+   * socket) y después cada Command pasa exactamente por el mismo
+   * applyAndBroadcast que un comando manual -- mismo control de rol, mismo
+   * optimistic locking, misma retransmisión a la sala.
+   */
+  @SubscribeMessage('assistant_instruction')
+  async handleAssistantInstruction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: AssistantInstructionPayload,
+  ): Promise<AssistantInstructionResponse> {
+    const data = client.data as SocketData;
+
+    if (data.diagramId !== payload.diagramId) {
+      return { ok: false, reason: 'not_joined', message: 'No estás conectado a ese diagrama.' };
+    }
+
+    let diagram: Awaited<ReturnType<DiagramsService['getByIdWithAccess']>>['diagram'];
+    let access: AccessLevel;
+    try {
+      ({ diagram, access } = await this.diagramsService.getByIdWithAccess(payload.diagramId, data.user.sub));
+    } catch {
+      return { ok: false, reason: 'not_found', message: 'No se encontró el diagrama.' };
+    }
+
+    if (access === 'VIEWER') {
+      return { ok: false, reason: 'read_only', message: 'Tu rol en este proyecto es de solo lectura.' };
+    }
+
+    const interpretation = await this.assistantService.interpret(payload.instruction, {
+      model: diagram.model as unknown as UMLModel,
+    });
+
+    if (!interpretation.ok) {
+      return { ok: false, reason: interpretation.reason, message: interpretation.message };
+    }
+
+    let lastVersion = diagram.version;
+    for (const command of interpretation.commands) {
+      const result = await this.applyAndBroadcast(client, payload.diagramId, data.user.sub, command);
+      if (!result.ok) {
+        return { ok: false, reason: result.reason, message: describeApplyFailure(result) };
+      }
+      lastVersion = result.version;
+    }
+
+    return { ok: true, message: interpretation.message, version: lastVersion, commands: interpretation.commands };
+  }
+
+  private async applyAndBroadcast(
+    client: Socket,
+    diagramId: string,
+    userId: string,
+    command: Command,
+  ): Promise<ApplyCommandResult> {
+    const result = await this.diagramsService.applyCommandToDiagram(diagramId, userId, command);
+
+    if (result.ok) {
+      // Al resto de la sala (no al emisor: ya aplicó el comando localmente de forma optimista,
+      // o -- si vino del asistente -- se lo mandamos en el ack de assistant_instruction).
+      client.to(roomFor(diagramId)).emit('remote_command', { command, version: result.version });
+    }
+
+    return result;
+  }
+}
+
+function describeApplyFailure(result: Extract<ApplyCommandResult, { ok: false }>): string {
+  switch (result.reason) {
+    case 'invalid':
+      return result.error.message;
+    case 'conflict':
+      return 'Otro cambio se aplicó al mismo tiempo, reintentá la instrucción.';
+    case 'read_only':
+      return 'Tu rol en este proyecto es de solo lectura.';
   }
 }

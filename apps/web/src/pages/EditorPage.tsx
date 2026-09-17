@@ -5,6 +5,7 @@ import { DiagramCanvas } from '../components/canvas/DiagramCanvas';
 import { Inspector } from '../components/panels/Inspector';
 import { Toolbar } from '../components/panels/Toolbar';
 import { ShareDialog } from '../components/share/ShareDialog';
+import { AssistantChat } from '../components/assistant/AssistantChat';
 import { useUmlStore } from '../store/useUmlStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { getDiagram } from '../api/diagrams';
@@ -109,6 +110,7 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
           <div className="app-layout__body">
             <DiagramCanvas />
             <Inspector />
+            <AssistantChat />
           </div>
         </div>
       </ReactFlowProvider>

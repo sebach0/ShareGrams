@@ -4,7 +4,7 @@ import type { Command, UMLModel } from '@sharegrams/uml-core';
 import type { AccessLevel } from '../api/types';
 import { useUmlStore } from '../store/useUmlStore';
 import { createDiagramSocket } from './socket';
-import { CollabContext, type CollabContextValue, type ConnectionStatus } from './collabContext';
+import { CollabContext, type AssistantInstructionResult, type CollabContextValue, type ConnectionStatus } from './collabContext';
 
 interface JoinDiagramResponse {
   ok: boolean;
@@ -16,6 +16,10 @@ interface JoinDiagramResponse {
 interface CommandAckResponse {
   ok: boolean;
 }
+
+type AssistantInstructionResponse =
+  | { ok: true; message: string; version: number; commands: Command[] }
+  | { ok: false; reason: string; message: string };
 
 interface RoleChangedPayload {
   role: AccessLevel;
@@ -103,7 +107,41 @@ export function CollabProvider({ diagramId, token, onOutOfSync, onAccessRevoked,
     [diagramId, role, onOutOfSync],
   );
 
-  const value = useMemo<CollabContextValue>(() => ({ status, role, dispatch }), [status, role, dispatch]);
+  const sendAssistantInstruction = useMemo<CollabContextValue['sendAssistantInstruction']>(
+    () => (instruction) =>
+      new Promise<AssistantInstructionResult>((resolve) => {
+        if (role === 'VIEWER') {
+          resolve({ ok: false, message: 'Tu rol en este proyecto es de solo lectura.' });
+          return;
+        }
+        socketRef.current?.emit(
+          'assistant_instruction',
+          { diagramId, instruction },
+          (response: AssistantInstructionResponse) => {
+            if (response.ok) {
+              // Ya se aplicaron y persistieron en el servidor: si el replay local falla
+              // (por ejemplo, este cliente quedó desactualizado por otro cambio concurrente),
+              // no hay nada que "reintentar" acá -- se resincroniza el modelo completo.
+              for (const command of response.commands) {
+                if (!useUmlStore.getState().applyRemoteCommand(command)) {
+                  onOutOfSync();
+                  break;
+                }
+              }
+              resolve({ ok: true, message: response.message });
+            } else {
+              resolve({ ok: false, message: response.message });
+            }
+          },
+        );
+      }),
+    [diagramId, role, onOutOfSync],
+  );
+
+  const value = useMemo<CollabContextValue>(
+    () => ({ status, role, dispatch, sendAssistantInstruction }),
+    [status, role, dispatch, sendAssistantInstruction],
+  );
 
   return <CollabContext.Provider value={value}>{children}</CollabContext.Provider>;
 }

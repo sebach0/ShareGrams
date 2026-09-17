@@ -3,6 +3,9 @@ export interface EnvConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
   port: number;
+  /** Ausente en dev si todavía no se configuró: el asistente de IA es una feature opcional, no debe tumbar el arranque del resto de la API. */
+  anthropicApiKey?: string;
+  anthropicModel: string;
 }
 
 /**
@@ -26,5 +29,7 @@ export function loadEnv(): EnvConfig {
     jwtSecret,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
     port: Number(process.env.PORT ?? 3000),
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
   };
 }
