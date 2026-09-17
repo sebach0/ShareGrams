@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAssistantInstruction, useIsReadOnly } from '../../realtime/collabContext';
+import { useSpeechRecognition } from '../../realtime/useSpeechRecognition';
 
 interface AssistantMessage {
   id: string;
@@ -21,6 +22,12 @@ export function AssistantChat() {
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+
+  // Fase 6: la voz solo llena el input, no manda nada sola. El usuario revisa
+  // la transcripción y aprieta "Enviar" él mismo -- misma decisión que ya
+  // tomamos para no ejecutar sin revisión una instrucción destructiva
+  // (DELETE_CLASS, DELETE_RELATIONSHIP) que el reconocimiento haya escuchado mal.
+  const speech = useSpeechRecognition({ onResult: (transcript) => setInput(transcript) });
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -59,10 +66,23 @@ export function AssistantChat() {
           </li>
         ))}
       </ul>
+      {speech.error && <p className="assistant-chat__speech-error">{speech.error}</p>}
       <form className="assistant-chat__form" onSubmit={handleSubmit}>
+        {speech.supported && (
+          <button
+            type="button"
+            className={`assistant-chat__mic${speech.listening ? ' assistant-chat__mic--listening' : ''}`}
+            onClick={speech.listening ? speech.stop : speech.start}
+            disabled={readOnly || sending}
+            title={speech.listening ? 'Escuchando… (click para detener)' : 'Dictar instrucción por voz'}
+            aria-label={speech.listening ? 'Detener dictado por voz' : 'Dictar instrucción por voz'}
+          >
+            🎤
+          </button>
+        )}
         <input
           type="text"
-          placeholder={readOnly ? 'Solo lectura' : 'Escribí una instrucción…'}
+          placeholder={readOnly ? 'Solo lectura' : speech.listening ? 'Escuchando…' : 'Escribí una instrucción…'}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={readOnly || sending}
