@@ -13,6 +13,8 @@ Herramienta CASE colaborativa para diseño de datos mediante diagramas de clases
 
 Toda la lógica de traducción/resolución está cubierta por tests con el proveedor de IA mockeado, pero ninguna de las tres todavía se corrió contra la API real de Anthropic (falta configurar `ANTHROPIC_API_KEY`, ver más abajo).
 
+**Fase 8 (XMI / interoperabilidad con Enterprise Architect) — implementada y verificada de punta a punta.** A diferencia de las fases de IA, esta no depende de ningún servicio externo: es conversión de formato pura, 100% en el navegador (`packages/uml-core`, sin tocar el backend). Los botones "⬇ Exportar XMI" y "📄 Importar XMI" del editor exportan/leen XMI 2.1 (UML2). El export se probó exportando un diagrama real y abriéndolo en Enterprise Architect; el import se probó contra un archivo exportado desde EA real, incluido tal cual como fixture de test (`packages/uml-core/tests/xmiImport.test.ts`). Solo soporta XMI 2.1/UML2 (el dialecto que exporta EA cuando se elige esa versión explícitamente) — no el XMI 1.1/UML 1.3 legado, que es una estructura completamente distinta.
+
 ## Estructura del repositorio
 
 ```
@@ -23,7 +25,7 @@ apps/
   web/         # Editor UML (React + Vite + React Flow + Zustand)
 ```
 
-Regla de arquitectura: el canvas nunca modifica el modelo directamente. Toda mutación pasa por un `Command` (CREATE_CLASS, MOVE_CLASS, ADD_ATTRIBUTE, CREATE_RELATIONSHIP, UPDATE_MULTIPLICITY, etc.) que `uml-core` valida y aplica. Esta es la misma vía que usan el editor manual, la colaboración en tiempo real y el asistente de IA, y la que van a reutilizar el importador XMI y el generador de Spring Boot en fases posteriores.
+Regla de arquitectura: el canvas nunca modifica el modelo directamente. Toda mutación pasa por un `Command` (CREATE_CLASS, MOVE_CLASS, ADD_ATTRIBUTE, CREATE_RELATIONSHIP, UPDATE_MULTIPLICITY, etc.) que `uml-core` valida y aplica. Esta es la misma vía que usan el editor manual, la colaboración en tiempo real, el asistente de IA y el importador de imagen/XMI (que arman un batch de comandos y lo aplican con el mismo dispatch, tras una vista previa), y la que va a reutilizar el generador de Spring Boot en fases posteriores.
 
 ## Cómo correr el proyecto
 
@@ -49,7 +51,7 @@ npm run dev:web           # levanta el editor en http://localhost:5173
 **Tests:**
 
 ```bash
-npm run test:uml-core   # tests del modelo UML
+npm run test:uml-core   # tests del modelo UML, export/import XMI
 npm run test:api        # tests del backend (auth, proyectos, diagramas, tiempo real, asistente de IA, reconocimiento de imagen)
 npm run test:web        # tests del store del editor
 npm test                # corre los tres
