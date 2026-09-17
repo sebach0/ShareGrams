@@ -106,7 +106,7 @@ function EditorPage({ diagramId }: { diagramId: string | undefined }) {
             <ConnectionBadge />
             <ShareButton onOpen={() => setShareOpen(true)} />
           </header>
-          <Toolbar />
+          <Toolbar diagramId={diagramId} />
           <div className="app-layout__body">
             <DiagramCanvas />
             <Inspector />

@@ -1,6 +1,8 @@
+import { useRef, useState } from 'react';
 import { generateId } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
 import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
+import { ImageImportDialog } from '../image-import/ImageImportDialog';
 
 function nextClassName(existingNames: string[]): string {
   const normalized = existingNames.map((n) => n.toLowerCase());
@@ -9,12 +11,18 @@ function nextClassName(existingNames: string[]): string {
   return `Clase${index}`;
 }
 
-export function Toolbar() {
+interface ToolbarProps {
+  diagramId: string;
+}
+
+export function Toolbar({ diagramId }: ToolbarProps) {
   const model = useUmlStore((s) => s.model);
   const selection = useUmlStore((s) => s.selection);
   const dispatch = useCollabDispatch();
   const select = useUmlStore((s) => s.select);
   const readOnly = useIsReadOnly();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   const handleAddClass = () => {
     const name = nextClassName(model.classes.map((c) => c.name));
@@ -45,7 +53,24 @@ export function Toolbar() {
       <button type="button" onClick={handleDeleteSelection} disabled={readOnly || !selection}>
         Eliminar seleccionado
       </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) setImportFile(file);
+          e.target.value = '';
+        }}
+      />
+      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={readOnly}>
+        📷 Importar imagen
+      </button>
       {readOnly && <span className="toolbar__readonly">Solo lectura</span>}
+      {importFile && (
+        <ImageImportDialog diagramId={diagramId} file={importFile} onClose={() => setImportFile(null)} />
+      )}
     </header>
   );
 }

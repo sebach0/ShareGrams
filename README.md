@@ -6,7 +6,12 @@ Herramienta CASE colaborativa para diseño de datos mediante diagramas de clases
 
 **Fases 1-4 — estables.** Editor UML (crear/mover/editar clases, atributos, relaciones y multiplicidades), persistencia con proyectos y usuarios, y colaboración en tiempo real vía WebSockets: varios usuarios conectados al mismo diagrama ven los cambios de los demás sin recargar la página, con concurrencia resuelta por bloqueo optimista (versión del diagrama) y roles de colaborador (dueño / Editor / Lector, con invitación, expulsión y cambio de rol en caliente).
 
-**Fase 5 (asistente de IA por texto) — implementada, pendiente de verificación con la API real.** El editor incluye un panel de chat donde se pueden pedir ediciones puntuales en lenguaje natural ("Crear una clase Cliente", "Agregar un atributo correo de tipo String a Cliente"), que se traducen a los mismos `Command` que usa el editor manual — nunca genera un diagrama completo de una descripción. Toda la lógica de traducción está cubierta por tests con el proveedor de IA mockeado, pero todavía no se corrió contra la API real de Anthropic (falta configurar `ANTHROPIC_API_KEY`, ver más abajo).
+**Fases 5-7 (IA: texto, voz, imagen) — implementadas, pendientes de verificación con la API real.** El editor incluye:
+- un panel de chat para pedir ediciones puntuales en lenguaje natural ("Crear una clase Cliente", "Agregar un atributo correo de tipo String a Cliente"), que se traducen a los mismos `Command` que usa el editor manual — nunca genera un diagrama completo de una descripción;
+- un botón de micrófono que dicta esa misma instrucción por voz (Web Speech API del navegador, sin motor de voz propio: solo llena el input de texto, el usuario revisa y manda);
+- un botón "Importar imagen" que reconoce un diagrama de clases a partir de una foto o captura y arma una vista previa (clases, atributos, relaciones) para confirmar antes de aplicar nada al diagrama real.
+
+Toda la lógica de traducción/resolución está cubierta por tests con el proveedor de IA mockeado, pero ninguna de las tres todavía se corrió contra la API real de Anthropic (falta configurar `ANTHROPIC_API_KEY`, ver más abajo).
 
 ## Estructura del repositorio
 
@@ -45,7 +50,7 @@ npm run dev:web           # levanta el editor en http://localhost:5173
 
 ```bash
 npm run test:uml-core   # tests del modelo UML
-npm run test:api        # tests del backend (auth, proyectos, diagramas, tiempo real, asistente de IA)
+npm run test:api        # tests del backend (auth, proyectos, diagramas, tiempo real, asistente de IA, reconocimiento de imagen)
 npm run test:web        # tests del store del editor
 npm test                # corre los tres
 ```

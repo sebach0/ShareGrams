@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { DiagramsModule } from './diagrams/diagrams.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { ImageImportModule } from './image-import/image-import.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     ProjectsModule,
     DiagramsModule,
     RealtimeModule,
+    ImageImportModule,
   ],
 })
 export class AppModule {}

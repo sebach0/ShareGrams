@@ -520,3 +520,62 @@
   font-style: italic;
   font-size: 13px;
 }
+
+.image-import__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.image-import {
+  width: 420px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.image-import__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.image-import__header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.image-import__header button {
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.image-import__error {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.image-import__warnings {
+  margin: 0.5rem 0;
+  padding-left: 1.2rem;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.image-import__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

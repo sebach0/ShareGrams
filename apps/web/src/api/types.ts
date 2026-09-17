@@ -1,4 +1,4 @@
-import type { UMLModel } from '@sharegrams/uml-core';
+import type { Command, UMLModel } from '@sharegrams/uml-core';
 
 export interface PublicUser {
   id: string;
@@ -47,3 +47,7 @@ export interface ProjectMember {
   createdAt: string;
   user: PublicUser;
 }
+
+export type ImageRecognitionResult =
+  | { ok: true; commands: Command[]; summary: string; warnings: string[] }
+  | { ok: false; reason: 'unreadable' | 'not_configured' | 'error'; message: string };

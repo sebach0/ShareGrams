@@ -1,5 +1,5 @@
-import { generateId } from '@sharegrams/uml-core';
-import type { Command, Multiplicity, PrimitiveType, RelationshipType, UMLClass, UMLModel, UMLRelationship } from '@sharegrams/uml-core';
+import { generateId, parseMultiplicity } from '@sharegrams/uml-core';
+import type { Command, PrimitiveType, RelationshipType, UMLClass, UMLModel, UMLRelationship } from '@sharegrams/uml-core';
 import type { AssistantToolInputMap, AssistantToolName } from './assistant.tools';
 
 /**
@@ -91,21 +91,6 @@ function endFor(relationship: UMLRelationship, classId: string): 'source' | 'tar
 function nextPosition(model: UMLModel): { x: number; y: number } {
   const index = model.classes.length;
   return { x: 120 + (index % 4) * 220, y: 120 + Math.floor(index / 4) * 160 };
-}
-
-function parseUpper(value: unknown): number | '*' | null {
-  if (value === '*') return '*';
-  if (typeof value === 'number' && Number.isInteger(value)) return value;
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
-  return null;
-}
-
-function parseMultiplicity(raw: { lower: unknown; upper: unknown } | undefined): Multiplicity | null {
-  if (!raw) return null;
-  const lower = typeof raw.lower === 'number' ? raw.lower : Number(raw.lower);
-  const upper = parseUpper(raw.upper);
-  if (!Number.isInteger(lower) || upper === null) return null;
-  return { lower, upper };
 }
 
 export function resolveToolCall(model: UMLModel, toolName: AssistantToolName, rawInput: unknown): ResolveResult {
