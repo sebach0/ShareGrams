@@ -132,7 +132,11 @@ function DraggableLabel({ x, y, className, onMoveEnd, onDoubleClick, children }:
 
   return (
     <div
-      className={className}
+      // nodrag/nopan: le dicen a React Flow que no trate este pointerdown como
+      // el arranque de un pan/selección del canvas -- sin esto, ese gesto
+      // interno se queda con el pointermove y el nuestro nunca ve que el
+      // mouse se movió (por eso el punto no seguía al cursor).
+      className={`${className} nodrag nopan`}
       style={{
         transform: `translate(-50%, -50%) translate(${displayX}px, ${displayY}px)`,
         pointerEvents: 'all',

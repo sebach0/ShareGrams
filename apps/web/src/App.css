@@ -58,6 +58,21 @@
   transition: transform 150ms ease;
 }
 
+/*
+ * React Flow monta el div de EdgeLabelRenderer (donde viven las etiquetas,
+ * quiebres y puntas de conexión que dibuja RelationshipEdge) ANTES que el
+ * contenedor de los nodos en el DOM, y ninguno de los dos trae z-index
+ * propio -- así que por orden de pintado los nodos siempre quedan encima.
+ * Un z-index en un hijo nuestro (ej. .uml-endpoint) no alcanza a "escapar"
+ * ese contenedor para ganarle a un hermano ya pintado por encima; hay que
+ * subir el contenedor entero. El propio div trae pointer-events:none, así
+ * que esto no bloquea clicks en el resto del canvas -- solo importa donde
+ * un hijo nuestro pone pointer-events:all explícitamente.
+ */
+.react-flow__edgelabel-renderer {
+  z-index: 1000;
+}
+
 .uml-class-node {
   min-width: 160px;
   border: 1.5px solid #333;
@@ -151,8 +166,6 @@
   align-items: center;
   justify-content: center;
   cursor: grab;
-  /* Por encima de los handles de conexión de la clase, que quedan cerca de este punto. */
-  z-index: 1000;
 }
 
 .uml-endpoint span {
