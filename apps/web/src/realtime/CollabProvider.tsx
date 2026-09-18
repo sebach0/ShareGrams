@@ -95,7 +95,9 @@ export function CollabProvider({ diagramId, token, onOutOfSync, onAccessRevoked,
 
   const dispatch = useMemo<CollabContextValue['dispatch']>(
     () => (command) => {
-      if (role === 'VIEWER') return false; // el servidor lo rechazaría igual; esto evita el viaje de ida y vuelta
+      if (role === 'VIEWER') {
+        return false;
+      }
       const ok = useUmlStore.getState().dispatch(command);
       if (ok) {
         socketRef.current?.emit('command', { diagramId, command }, (response: CommandAckResponse) => {
@@ -103,6 +105,41 @@ export function CollabProvider({ diagramId, token, onOutOfSync, onAccessRevoked,
         });
       }
       return ok;
+    },
+    [diagramId, role, onOutOfSync],
+  );
+
+  const dispatchBatch = useMemo<CollabContextValue['dispatchBatch']>(
+    () => async (commands) => {
+      if (role === 'VIEWER') {
+        return { appliedCount: 0, total: commands.length, error: 'Tu rol en este proyecto es de solo lectura.' };
+      }
+
+      for (let i = 0; i < commands.length; i += 1) {
+        const command = commands[i];
+        const appliedLocally = useUmlStore.getState().dispatch(command);
+        if (!appliedLocally) {
+          return { appliedCount: i, total: commands.length, error: 'Un comando del lote no se pudo aplicar localmente.' };
+        }
+
+        // A propósito NO se manda el siguiente comando hasta tener el ack de este: un
+        // ADD_ATTRIBUTE necesita que su CREATE_CLASS ya esté confirmado en el servidor,
+        // y mandarlos todos de una (fire-and-forget) corre la carrera al revés.
+        const ack = await new Promise<CommandAckResponse>((resolve) => {
+          socketRef.current?.emit('command', { diagramId, command }, resolve);
+        });
+
+        if (!ack.ok) {
+          onOutOfSync();
+          return {
+            appliedCount: i,
+            total: commands.length,
+            error: 'El servidor rechazó un comando a mitad del import; se resincronizó el diagrama con lo que sí se aplicó.',
+          };
+        }
+      }
+
+      return { appliedCount: commands.length, total: commands.length };
     },
     [diagramId, role, onOutOfSync],
   );
@@ -139,8 +176,8 @@ export function CollabProvider({ diagramId, token, onOutOfSync, onAccessRevoked,
   );
 
   const value = useMemo<CollabContextValue>(
-    () => ({ status, role, dispatch, sendAssistantInstruction }),
-    [status, role, dispatch, sendAssistantInstruction],
+    () => ({ status, role, dispatch, dispatchBatch, sendAssistantInstruction }),
+    [status, role, dispatch, dispatchBatch, sendAssistantInstruction],
   );
 
   return <CollabContext.Provider value={value}>{children}</CollabContext.Provider>;

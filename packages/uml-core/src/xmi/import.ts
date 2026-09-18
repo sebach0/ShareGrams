@@ -77,6 +77,7 @@ interface ParsedAssociationEnd {
 }
 
 interface ParsedAssociation {
+  name: string | undefined;
   ends: ParsedAssociationEnd[];
 }
 
@@ -132,7 +133,7 @@ function walkPackagedElements(nodes: XmlNode[], tree: ParseTree): void {
           tree.warnings.push('Se ignoró una asociación sin dos extremos reconocibles.');
           break;
         }
-        tree.associations.push({ ends });
+        tree.associations.push({ name: attr(node, 'name'), ends });
         break;
       }
       case 'uml:Generalization': {
@@ -264,6 +265,7 @@ export function importFromXmi(xmiText: string): XmiImportResult {
       targetClassId,
       sourceMultiplicity: source.multiplicity,
       targetMultiplicity: target.multiplicity,
+      name: association.name,
     });
     if (source.role || target.role) {
       commands.push({ type: 'UPDATE_RELATIONSHIP', relationshipId, sourceRole: source.role, targetRole: target.role });

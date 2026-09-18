@@ -52,6 +52,30 @@ export interface UMLClass {
   position: Position;
 }
 
+/**
+ * Dirección (no necesariamente unitaria) desde el centro de una clase hacia
+ * el punto exacto de su borde donde se engancha un extremo de relación.
+ * Metadata de presentación pura, como Position: no tiene efecto en la
+ * semántica UML. Ausente = el canvas calcula el punto automáticamente
+ * (apuntando al centro de la otra clase) en vez de anclarlo a mano.
+ */
+export interface AnchorDirection {
+  dx: number;
+  dy: number;
+}
+
+/** Desplazamiento manual (en píxeles del canvas) de una etiqueta respecto a su posición calculada por defecto. */
+export interface LabelOffset {
+  dx: number;
+  dy: number;
+}
+
+/** Punto de quiebre intermedio de una relación, en coordenadas absolutas del canvas (como Position de una clase). Permite dibujar la línea con ángulos en vez de una curva directa entre los dos extremos. */
+export interface Waypoint {
+  x: number;
+  y: number;
+}
+
 export interface UMLRelationship {
   id: string;
   type: RelationshipType;
@@ -62,6 +86,15 @@ export interface UMLRelationship {
   targetMultiplicity?: Multiplicity;
   sourceRole?: string;
   targetRole?: string;
+  /** Nombre de la asociación (dato UML real, ej. "Pertenece"). Ausente para GENERALIZATION. */
+  name?: string;
+  sourceAnchor?: AnchorDirection;
+  targetAnchor?: AnchorDirection;
+  sourceLabelOffset?: LabelOffset;
+  targetLabelOffset?: LabelOffset;
+  nameLabelOffset?: LabelOffset;
+  /** Ausente o vacío = línea directa entre los dos extremos (curva automática). */
+  waypoints?: Waypoint[];
 }
 
 export interface UMLModel {

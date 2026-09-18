@@ -3,7 +3,7 @@ import type { Command } from '@sharegrams/uml-core';
 import { recognizeImage } from '../../api/imageImport';
 import { ApiError } from '../../api/client';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatchBatch } from '../../realtime/collabContext';
 
 interface ImageImportDialogProps {
   diagramId: string;
@@ -16,19 +16,22 @@ type Status = 'recognizing' | 'ready' | 'unreadable' | 'error';
 /**
  * Reconoce la imagen apenas se abre (elegir el archivo ya es la acción del
  * usuario) y muestra una vista previa -- nunca aplica nada solo. Recién al
- * confirmar se despachan los comandos, uno por uno, con el mismo
- * useCollabDispatch que usa el resto del editor: mismo control de rol,
- * misma validación, misma retransmisión a la sala.
+ * confirmar se despachan los comandos con dispatchBatch, que espera la
+ * confirmación del servidor de cada uno antes de mandar el siguiente (un
+ * ADD_ATTRIBUTE necesita que su CREATE_CLASS ya esté confirmado -- mandarlos
+ * todos de una corría el riesgo de que el servidor rechace uno por llegar
+ * antes que el comando del que depende).
  */
 export function ImageImportDialog({ diagramId, file, onClose }: ImageImportDialogProps) {
   const token = useAuthStore((s) => s.token);
-  const dispatch = useCollabDispatch();
+  const dispatchBatch = useCollabDispatchBatch();
 
   const [status, setStatus] = useState<Status>('recognizing');
   const [message, setMessage] = useState('');
   const [commands, setCommands] = useState<Command[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -58,12 +61,14 @@ export function ImageImportDialog({ diagramId, file, onClose }: ImageImportDialo
     };
   }, [token, diagramId, file]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setApplying(true);
-    for (const command of commands) {
-      dispatch(command);
-    }
+    const result = await dispatchBatch(commands);
     setApplying(false);
+    if (result.error) {
+      setApplyError(`${result.error} (se aplicaron ${result.appliedCount} de ${result.total}.)`);
+      return;
+    }
     onClose();
   };
 
@@ -98,6 +103,7 @@ export function ImageImportDialog({ diagramId, file, onClose }: ImageImportDialo
                 ))}
               </ul>
             )}
+            {applyError && <p className="image-import__error">{applyError}</p>}
             <div className="image-import__actions">
               <button type="button" onClick={onClose} disabled={applying}>
                 Descartar

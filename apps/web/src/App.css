@@ -45,6 +45,19 @@
   min-width: 0;
 }
 
+/*
+ * Mientras se arrastra a mano, React Flow ya mueve el nodo en vivo con el
+ * mouse (nativo, sin esto). Esta transición es para todo lo demás que
+ * cambia una posición sin ser un arrastre local: un MOVE_CLASS que llega de
+ * otro colaborador, o el acomodo en grilla al confirmar un import -- antes
+ * pegaban un salto instantáneo, ahora se ven deslizarse. Se excluye
+ * ".dragging" (la clase que pone React Flow mientras el mouse sigue
+ * apretado) para no meterle inercia justo al gesto que ya es fluido solo.
+ */
+.react-flow__node:not(.dragging) {
+  transition: transform 150ms ease;
+}
+
 .uml-class-node {
   min-width: 160px;
   border: 1.5px solid #333;
@@ -92,6 +105,63 @@
 .uml-edge-label--center {
   font-weight: 600;
   color: #444;
+}
+
+.uml-edge-label--name {
+  font-style: italic;
+  color: #1e3a8a;
+  border: 1px solid #dbeafe;
+}
+
+.uml-waypoint {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uml-waypoint span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px #2563eb;
+  display: block;
+}
+
+.uml-waypoint--add span {
+  background: #fff;
+  border: 1.5px dashed #94a3b8;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.uml-waypoint--add:hover span {
+  opacity: 1;
+}
+
+.uml-endpoint {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  /* Por encima de los handles de conexión de la clase, que quedan cerca de este punto. */
+  z-index: 1000;
+}
+
+.uml-endpoint span {
+  width: 10px;
+  height: 10px;
+  background: #f97316;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px #f97316;
+  display: block;
 }
 
 .inspector {

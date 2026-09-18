@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react';
-import { Background, Controls, ReactFlow } from '@xyflow/react';
-import type { EdgeMouseHandler, NodeMouseHandler, OnNodeDrag, OnConnect } from '@xyflow/react';
+import { useCallback, useMemo, useRef } from 'react';
+import { Background, Controls, ReactFlow, useReactFlow } from '@xyflow/react';
+import type { EdgeMouseHandler, NodeMouseHandler, OnNodeDrag, OnConnectStart, OnConnectEnd } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { generateId } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
@@ -13,12 +13,20 @@ import type { RelationshipEdgeType } from './RelationshipEdge';
 const nodeTypes = { umlClass: ClassNode };
 const edgeTypes = { umlRelationship: RelationshipEdge };
 
+/** MouseEvent y TouchEvent no tienen la misma forma para leer dónde está el puntero. */
+function clientPointOf(event: MouseEvent | TouchEvent): { clientX: number; clientY: number } {
+  if ('changedTouches' in event && event.changedTouches.length > 0) return event.changedTouches[0];
+  if ('touches' in event && event.touches.length > 0) return event.touches[0];
+  return event as MouseEvent;
+}
+
 export function DiagramCanvas() {
   const model = useUmlStore((s) => s.model);
   const selection = useUmlStore((s) => s.selection);
   const dispatch = useCollabDispatch();
   const readOnly = useIsReadOnly();
   const select = useUmlStore((s) => s.select);
+  const { screenToFlowPosition } = useReactFlow();
 
   const nodes: ClassNodeType[] = useMemo(
     () =>
@@ -52,20 +60,57 @@ export function DiagramCanvas() {
     [dispatch],
   );
 
-  const onConnect: OnConnect = useCallback(
-    (connection) => {
-      if (!connection.source || !connection.target) return;
+  // A dónde (en coordenadas del canvas, no de la pantalla) empezó el arrastre
+  // de una conexión nueva. Se calcula del evento crudo del mouse/touch, no de
+  // connectionState.pointer -- ver el comentario largo en onConnectEnd.
+  const connectStartPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onConnectStart: OnConnectStart = useCallback(
+    (event) => {
+      const point = clientPointOf(event);
+      connectStartPointRef.current = screenToFlowPosition({ x: point.clientX, y: point.clientY });
+    },
+    [screenToFlowPosition],
+  );
+
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event, connectionState) => {
+      const startPoint = connectStartPointRef.current;
+      connectStartPointRef.current = null;
+      if (!startPoint || !connectionState.isValid || !connectionState.fromNode || !connectionState.toNode) return;
+
+      const sourceNode = connectionState.fromNode;
+      const targetNode = connectionState.toNode;
+      const sourceCenter = {
+        x: sourceNode.internals.positionAbsolute.x + (sourceNode.measured.width ?? 0) / 2,
+        y: sourceNode.internals.positionAbsolute.y + (sourceNode.measured.height ?? 0) / 2,
+      };
+      const targetCenter = {
+        x: targetNode.internals.positionAbsolute.x + (targetNode.measured.width ?? 0) / 2,
+        y: targetNode.internals.positionAbsolute.y + (targetNode.measured.height ?? 0) / 2,
+      };
+      // connectionState.pointer no da un punto confiable acá (en la práctica
+      // termina pisando el centro del nodo, produciendo un anchor {0,0} --
+      // exactamente el bug de "la línea se conecta al centro"). El evento
+      // crudo del mouse/touch sí tiene la posición real donde se soltó.
+      const point = clientPointOf(event);
+      const endPoint = screenToFlowPosition({ x: point.clientX, y: point.clientY });
+
       dispatch({
         type: 'CREATE_RELATIONSHIP',
         relationshipId: generateId(),
         relationshipType: 'ASSOCIATION',
-        sourceClassId: connection.source,
-        targetClassId: connection.target,
+        sourceClassId: sourceNode.id,
+        targetClassId: targetNode.id,
         sourceMultiplicity: { lower: 0, upper: '*' },
         targetMultiplicity: { lower: 0, upper: '*' },
+        // Dirección real hacia donde arrastraste (píxel a píxel, no un punto
+        // fijo): así la relación queda enganchada justo donde la soltaste.
+        sourceAnchor: { dx: startPoint.x - sourceCenter.x, dy: startPoint.y - sourceCenter.y },
+        targetAnchor: { dx: endPoint.x - targetCenter.x, dy: endPoint.y - targetCenter.y },
       });
     },
-    [dispatch],
+    [dispatch, screenToFlowPosition],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -88,7 +133,8 @@ export function DiagramCanvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeDragStop={onNodeDragStop}
-        onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}

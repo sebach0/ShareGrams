@@ -98,6 +98,29 @@ describe('importFromXmi', () => {
     });
   });
 
+  it('importa el name de la asociación cuando está presente (dato UML real, ej. "Pertenece")', () => {
+    const xml = `<?xml version="1.0"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+<uml:Model xmi:type="uml:Model" name="M">
+<packagedElement xmi:type="uml:Class" xmi:id="c1" name="Alumno"/>
+<packagedElement xmi:type="uml:Class" xmi:id="c2" name="Colegio"/>
+<packagedElement xmi:type="uml:Association" xmi:id="r1" name="Pertenece">
+<ownedEnd xmi:type="uml:Property" xmi:id="e1" type="c1" aggregation="none">
+<lowerValue xmi:type="uml:LiteralInteger" value="1"/><upperValue xmi:type="uml:LiteralInteger" value="1"/>
+</ownedEnd>
+<ownedEnd xmi:type="uml:Property" xmi:id="e2" type="c2" aggregation="none">
+<lowerValue xmi:type="uml:LiteralInteger" value="0"/><upperValue xmi:type="uml:LiteralUnlimitedNatural" value="-1"/>
+</ownedEnd>
+</packagedElement>
+</uml:Model>
+</xmi:XMI>`;
+
+    const result = importFromXmi(xml);
+
+    const relationship = result.commands.find((c) => c.type === 'CREATE_RELATIONSHIP');
+    expect(relationship).toMatchObject({ name: 'Pertenece' });
+  });
+
   it('para COMPOSITION, ubica como "todo" (source) al extremo que NO lleva el aggregation kind, sin importar el orden en el archivo', () => {
     const xml = `<?xml version="1.0"?>
 <xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">

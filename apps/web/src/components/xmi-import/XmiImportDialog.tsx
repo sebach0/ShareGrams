@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { importFromXmi } from '@sharegrams/uml-core';
 import type { Command } from '@sharegrams/uml-core';
-import { useCollabDispatch } from '../../realtime/collabContext';
+import { useCollabDispatchBatch } from '../../realtime/collabContext';
 
 interface XmiImportDialogProps {
   file: File;
@@ -11,19 +11,23 @@ interface XmiImportDialogProps {
 type Status = 'parsing' | 'ready' | 'empty' | 'error';
 
 /**
- * A diferencia de la importación por imagen, esto no toca el backend para
- * nada: parsear XMI es determinista y local (packages/uml-core). Mismo
- * criterio de vista previa igual: recién al confirmar se despachan los
- * comandos con el dispatch normal del editor.
+ * A diferencia de la importación por imagen, leer y parsear el XMI no toca
+ * el backend para nada: es determinista y local (packages/uml-core). Pero
+ * aplicar el resultado sí es igual que en Fase 7: dispatchBatch manda los
+ * comandos en orden, esperando la confirmación del servidor de cada uno
+ * antes del siguiente (un ADD_ATTRIBUTE necesita que su CREATE_CLASS ya
+ * esté confirmado -- mandarlos todos de una corría el riesgo de que el
+ * servidor rechace uno por llegar antes que el comando del que depende).
  */
 export function XmiImportDialog({ file, onClose }: XmiImportDialogProps) {
-  const dispatch = useCollabDispatch();
+  const dispatchBatch = useCollabDispatchBatch();
 
   const [status, setStatus] = useState<Status>('parsing');
   const [message, setMessage] = useState('');
   const [commands, setCommands] = useState<Command[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,12 +52,14 @@ export function XmiImportDialog({ file, onClose }: XmiImportDialogProps) {
     };
   }, [file]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setApplying(true);
-    for (const command of commands) {
-      dispatch(command);
-    }
+    const result = await dispatchBatch(commands);
     setApplying(false);
+    if (result.error) {
+      setApplyError(`${result.error} (se aplicaron ${result.appliedCount} de ${result.total}.)`);
+      return;
+    }
     onClose();
   };
 
@@ -88,6 +94,7 @@ export function XmiImportDialog({ file, onClose }: XmiImportDialogProps) {
                 ))}
               </ul>
             )}
+            {applyError && <p className="image-import__error">{applyError}</p>}
             <div className="image-import__actions">
               <button type="button" onClick={onClose} disabled={applying}>
                 Descartar

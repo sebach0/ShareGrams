@@ -1,4 +1,4 @@
-import type { Multiplicity, Position, PrimitiveType, RelationshipType, UMLModel } from '../model/types';
+import type { AnchorDirection, LabelOffset, Multiplicity, Position, PrimitiveType, RelationshipType, UMLModel, Waypoint } from '../model/types';
 
 export interface CreateClassCommand {
   type: 'CREATE_CLASS';
@@ -54,13 +54,45 @@ export interface CreateRelationshipCommand {
   targetClassId: string;
   sourceMultiplicity?: Multiplicity;
   targetMultiplicity?: Multiplicity;
+  /** Nombre de la asociación (dato UML real, ej. "Pertenece"). */
+  name?: string;
+  /** Punto exacto de enganche en cada extremo. Ausente = se calcula automáticamente. */
+  sourceAnchor?: AnchorDirection;
+  targetAnchor?: AnchorDirection;
 }
 
+/**
+ * sourceRole/targetRole/name son datos UML reales: este comando siempre
+ * sobreescribe los tres con lo que traiga (igual que ya hacía antes con los
+ * roles) -- quien llame y quiera tocar solo uno tiene que reenviar el valor
+ * actual de los otros dos, no dejarlos en blanco por accidente.
+ */
 export interface UpdateRelationshipCommand {
   type: 'UPDATE_RELATIONSHIP';
   relationshipId: string;
   sourceRole?: string;
   targetRole?: string;
+  name?: string;
+}
+
+/**
+ * Metadata de presentación pura (dónde se engancha cada extremo, dónde
+ * quedó arrastrada cada etiqueta). A diferencia de UPDATE_RELATIONSHIP,
+ * ESTE comando sí hace merge parcial de verdad: un campo ausente en el
+ * comando deja el valor actual sin tocar, porque cada arrastre normalmente
+ * solo cambia una cosa (un extremo, o una etiqueta) y forzar a reenviar
+ * las otras cuatro en cada drag sería un despropósito.
+ */
+export interface UpdateRelationshipLayoutCommand {
+  type: 'UPDATE_RELATIONSHIP_LAYOUT';
+  relationshipId: string;
+  sourceAnchor?: AnchorDirection;
+  targetAnchor?: AnchorDirection;
+  sourceLabelOffset?: LabelOffset;
+  targetLabelOffset?: LabelOffset;
+  nameLabelOffset?: LabelOffset;
+  /** A diferencia de los demás campos de este comando, waypoints REEMPLAZA la lista entera cuando viene presente (agregar/mover/quitar un punto siempre se calcula la lista completa nueva del lado del canvas). */
+  waypoints?: Waypoint[];
 }
 
 export interface DeleteRelationshipCommand {
@@ -85,6 +117,7 @@ export type Command =
   | DeleteAttributeCommand
   | CreateRelationshipCommand
   | UpdateRelationshipCommand
+  | UpdateRelationshipLayoutCommand
   | DeleteRelationshipCommand
   | UpdateMultiplicityCommand;
 

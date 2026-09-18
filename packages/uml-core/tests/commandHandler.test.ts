@@ -256,6 +256,45 @@ describe('relaciones y multiplicidad', () => {
     expect(next.relationships).toHaveLength(1);
   });
 
+  it('persiste sourceAnchor/targetAnchor/name cuando el comando los trae', () => {
+    const next = expectOk(
+      applyCommand(modelWithTwoClasses(), {
+        type: 'CREATE_RELATIONSHIP',
+        relationshipId: 'r1',
+        relationshipType: 'ASSOCIATION',
+        sourceClassId: 'c1',
+        targetClassId: 'c2',
+        sourceMultiplicity: { lower: 1, upper: 1 },
+        targetMultiplicity: { lower: 0, upper: '*' },
+        name: 'Pertenece',
+        sourceAnchor: { dx: -1, dy: 0 },
+        targetAnchor: { dx: -1, dy: 0 },
+      }),
+    );
+    expect(next.relationships[0]).toMatchObject({
+      name: 'Pertenece',
+      sourceAnchor: { dx: -1, dy: 0 },
+      targetAnchor: { dx: -1, dy: 0 },
+    });
+  });
+
+  it('name/sourceAnchor/targetAnchor quedan undefined si el comando no los especifica (caso IA/XMI/imagen)', () => {
+    const next = expectOk(
+      applyCommand(modelWithTwoClasses(), {
+        type: 'CREATE_RELATIONSHIP',
+        relationshipId: 'r1',
+        relationshipType: 'ASSOCIATION',
+        sourceClassId: 'c1',
+        targetClassId: 'c2',
+        sourceMultiplicity: { lower: 1, upper: 1 },
+        targetMultiplicity: { lower: 0, upper: '*' },
+      }),
+    );
+    expect(next.relationships[0].name).toBeUndefined();
+    expect(next.relationships[0].sourceAnchor).toBeUndefined();
+    expect(next.relationships[0].targetAnchor).toBeUndefined();
+  });
+
   it('rechaza una asociación sin multiplicidad', () => {
     const result = applyCommand(modelWithTwoClasses(), {
       type: 'CREATE_RELATIONSHIP',
@@ -330,6 +369,81 @@ describe('relaciones y multiplicidad', () => {
     );
     expect(next.relationships[0].sourceRole).toBe('cliente');
     expect(next.relationships[0].targetRole).toBe('pedidos');
+  });
+
+  it('actualiza el nombre de la relación junto con los roles', () => {
+    const next = expectOk(
+      applyCommand(modelWithAssociation(), {
+        type: 'UPDATE_RELATIONSHIP',
+        relationshipId: 'r1',
+        sourceRole: 'cliente',
+        targetRole: 'pedidos',
+        name: 'Pertenece',
+      }),
+    );
+    expect(next.relationships[0].name).toBe('Pertenece');
+  });
+
+  describe('UPDATE_RELATIONSHIP_LAYOUT', () => {
+    it('hace merge parcial: solo toca los campos que trae el comando', () => {
+      let model = modelWithAssociation();
+      model = expectOk(
+        applyCommand(model, {
+          type: 'UPDATE_RELATIONSHIP_LAYOUT',
+          relationshipId: 'r1',
+          sourceAnchor: { dx: -1, dy: 0 },
+          nameLabelOffset: { dx: 10, dy: -5 },
+        }),
+      );
+      expect(model.relationships[0]).toMatchObject({
+        sourceAnchor: { dx: -1, dy: 0 },
+        nameLabelOffset: { dx: 10, dy: -5 },
+      });
+
+      // Un segundo comando que solo toca targetAnchor no debe pisar lo que ya se guardó.
+      model = expectOk(
+        applyCommand(model, {
+          type: 'UPDATE_RELATIONSHIP_LAYOUT',
+          relationshipId: 'r1',
+          targetAnchor: { dx: 1, dy: 0 },
+        }),
+      );
+      expect(model.relationships[0]).toMatchObject({
+        sourceAnchor: { dx: -1, dy: 0 },
+        targetAnchor: { dx: 1, dy: 0 },
+        nameLabelOffset: { dx: 10, dy: -5 },
+      });
+    });
+
+    it('waypoints reemplaza la lista entera (a diferencia de los demás campos, que hacen merge)', () => {
+      let model = modelWithAssociation();
+      model = expectOk(
+        applyCommand(model, {
+          type: 'UPDATE_RELATIONSHIP_LAYOUT',
+          relationshipId: 'r1',
+          waypoints: [{ x: 50, y: 50 }],
+        }),
+      );
+      expect(model.relationships[0].waypoints).toEqual([{ x: 50, y: 50 }]);
+
+      model = expectOk(
+        applyCommand(model, {
+          type: 'UPDATE_RELATIONSHIP_LAYOUT',
+          relationshipId: 'r1',
+          waypoints: [{ x: 50, y: 50 }, { x: 80, y: 20 }],
+        }),
+      );
+      expect(model.relationships[0].waypoints).toEqual([{ x: 50, y: 50 }, { x: 80, y: 20 }]);
+    });
+
+    it('falla si la relación no existe', () => {
+      const result = applyCommand(modelWithAssociation(), {
+        type: 'UPDATE_RELATIONSHIP_LAYOUT',
+        relationshipId: 'no-existe',
+        sourceAnchor: { dx: 1, dy: 0 },
+      });
+      expectFail(result, 'RELATIONSHIP_NOT_FOUND');
+    });
   });
 
   it('actualiza la multiplicidad de un extremo', () => {

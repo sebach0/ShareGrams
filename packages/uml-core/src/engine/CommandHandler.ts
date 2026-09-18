@@ -5,6 +5,7 @@ import { addAttribute, updateAttribute, deleteAttribute } from './reducers/attri
 import {
   createRelationship,
   updateRelationship,
+  updateRelationshipLayout,
   deleteRelationship,
   updateMultiplicity,
 } from './reducers/relationshipReducers';
@@ -35,6 +36,8 @@ export function applyCommand(model: UMLModel, command: Command): CommandResult {
       return createRelationship(model, command);
     case 'UPDATE_RELATIONSHIP':
       return updateRelationship(model, command);
+    case 'UPDATE_RELATIONSHIP_LAYOUT':
+      return updateRelationshipLayout(model, command);
     case 'DELETE_RELATIONSHIP':
       return deleteRelationship(model, command);
     case 'UPDATE_MULTIPLICITY':

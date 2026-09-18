@@ -79,7 +79,8 @@ function renderAssociation(relationship: UMLRelationship): string {
     `type="${xmlId('class', relationship.targetClassId)}" association="${assocId}" aggregation="${aggregationKindFor(relationship.type, 'target')}">` +
     `${renderMultiplicity(relationship.targetMultiplicity)}</ownedEnd>`;
 
-  return `<packagedElement xmi:type="uml:Association" xmi:id="${assocId}" memberEnd="${sourceEndId} ${targetEndId}">${sourceEnd}${targetEnd}</packagedElement>`;
+  const nameAttr = relationship.name ? ` name="${escapeXml(relationship.name)}"` : '';
+  return `<packagedElement xmi:type="uml:Association" xmi:id="${assocId}"${nameAttr} memberEnd="${sourceEndId} ${targetEndId}">${sourceEnd}${targetEnd}</packagedElement>`;
 }
 
 function renderGeneralization(relationship: UMLRelationship): string {

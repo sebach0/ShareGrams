@@ -7,22 +7,28 @@ interface RelationshipInspectorProps {
   relationshipId: string;
 }
 
-function parseMultiplicity(input: string): Multiplicity | null {
-  const trimmed = input.trim();
-  if (trimmed === '*') return { lower: 0, upper: '*' };
-  if (/^\d+$/.test(trimmed)) return { lower: Number(trimmed), upper: Number(trimmed) };
-  const match = trimmed.match(/^(\d+)\.\.(\d+|\*)$/);
-  if (match) {
-    return { lower: Number(match[1]), upper: match[2] === '*' ? '*' : Number(match[2]) };
-  }
-  return null;
+/**
+ * Catálogo cerrado de multiplicidades (a pedido: nada de texto libre). "0..*"
+ * y "*" son semánticamente lo mismo en UML (lower:0, upper:'*') -- se dejan
+ * como dos opciones separadas porque son dos formas de escribirlo que la
+ * gente reconoce distinto, aunque produzcan el mismo valor.
+ */
+const MULTIPLICITY_OPTIONS: { label: string; value: Multiplicity }[] = [
+  { label: '0..1', value: { lower: 0, upper: 1 } },
+  { label: '1', value: { lower: 1, upper: 1 } },
+  { label: '0..*', value: { lower: 0, upper: '*' } },
+  { label: '1..*', value: { lower: 1, upper: '*' } },
+  { label: '*', value: { lower: 0, upper: '*' } },
+];
+
+function sameMultiplicity(a: Multiplicity, b: Multiplicity): boolean {
+  return a.lower === b.lower && a.upper === b.upper;
 }
 
-function formatMultiplicity(multiplicity?: Multiplicity): string {
+/** Si el valor no está en el catálogo (ej. vino de un import con una cota rara), no se fuerza ninguna opción. */
+function labelFor(multiplicity: Multiplicity | undefined): string {
   if (!multiplicity) return '';
-  return multiplicity.lower === multiplicity.upper
-    ? `${multiplicity.lower}`
-    : `${multiplicity.lower}..${multiplicity.upper}`;
+  return MULTIPLICITY_OPTIONS.find((option) => sameMultiplicity(option.value, multiplicity))?.label ?? '';
 }
 
 export function RelationshipInspector({ relationshipId }: RelationshipInspectorProps) {
@@ -35,12 +41,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
 
   const [sourceRole, setSourceRole] = useState(relationship?.sourceRole ?? '');
   const [targetRole, setTargetRole] = useState(relationship?.targetRole ?? '');
-  const [sourceMultiplicityText, setSourceMultiplicityText] = useState(
-    formatMultiplicity(relationship?.sourceMultiplicity),
-  );
-  const [targetMultiplicityText, setTargetMultiplicityText] = useState(
-    formatMultiplicity(relationship?.targetMultiplicity),
-  );
+  const [name, setName] = useState(relationship?.name ?? '');
 
   if (!relationship) return null;
 
@@ -48,19 +49,23 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
   const targetClassName = classes.find((c) => c.id === relationship.targetClassId)?.name ?? '?';
   const editableMultiplicity = relationship.type !== 'GENERALIZATION';
 
-  const commitRoles = () => {
+  // Los tres campos van siempre juntos en un UPDATE_RELATIONSHIP: el comando
+  // sobreescribe los tres con lo que le llega (ver comments en uml-core), así
+  // que tocar solo uno sin reenviar los otros dos los borraría sin querer.
+  const commitRelationshipData = () => {
     dispatch({
       type: 'UPDATE_RELATIONSHIP',
       relationshipId: relationship.id,
       sourceRole: sourceRole.trim() || undefined,
       targetRole: targetRole.trim() || undefined,
+      name: name.trim() || undefined,
     });
   };
 
-  const commitMultiplicity = (end: 'source' | 'target', text: string) => {
-    const parsed = parseMultiplicity(text);
-    if (!parsed) return;
-    dispatch({ type: 'UPDATE_MULTIPLICITY', relationshipId: relationship.id, end, multiplicity: parsed });
+  const handleMultiplicityChange = (end: 'source' | 'target', label: string) => {
+    const option = MULTIPLICITY_OPTIONS.find((candidate) => candidate.label === label);
+    if (!option) return;
+    dispatch({ type: 'UPDATE_MULTIPLICITY', relationshipId: relationship.id, end, multiplicity: option.value });
   };
 
   const handleDelete = () => {
@@ -80,27 +85,52 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
         <>
           <label className="inspector__field">
             <span>Multiplicidad en {sourceClassName}</span>
-            <input
-              value={sourceMultiplicityText}
-              onChange={(e) => setSourceMultiplicityText(e.target.value)}
-              onBlur={() => commitMultiplicity('source', sourceMultiplicityText)}
-              onKeyDown={(e) => e.key === 'Enter' && commitMultiplicity('source', sourceMultiplicityText)}
-              placeholder="1, 0..1, 0..*, *"
+            <select
+              value={labelFor(relationship.sourceMultiplicity)}
+              onChange={(e) => handleMultiplicityChange('source', e.target.value)}
               disabled={readOnly}
-            />
+            >
+              <option value="" disabled>
+                Elegir…
+              </option>
+              {MULTIPLICITY_OPTIONS.map((option) => (
+                <option key={option.label} value={option.label}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="inspector__field">
             <span>Multiplicidad en {targetClassName}</span>
-            <input
-              value={targetMultiplicityText}
-              onChange={(e) => setTargetMultiplicityText(e.target.value)}
-              onBlur={() => commitMultiplicity('target', targetMultiplicityText)}
-              onKeyDown={(e) => e.key === 'Enter' && commitMultiplicity('target', targetMultiplicityText)}
-              placeholder="1, 0..1, 0..*, *"
+            <select
+              value={labelFor(relationship.targetMultiplicity)}
+              onChange={(e) => handleMultiplicityChange('target', e.target.value)}
               disabled={readOnly}
-            />
+            >
+              <option value="" disabled>
+                Elegir…
+              </option>
+              {MULTIPLICITY_OPTIONS.map((option) => (
+                <option key={option.label} value={option.label}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
         </>
+      )}
+
+      {editableMultiplicity && (
+        <label className="inspector__field">
+          <span>Nombre de la relación (ej. "Pertenece")</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commitRelationshipData}
+            placeholder="Sin nombre"
+            disabled={readOnly}
+          />
+        </label>
       )}
 
       <label className="inspector__field">
@@ -108,7 +138,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
         <input
           value={sourceRole}
           onChange={(e) => setSourceRole(e.target.value)}
-          onBlur={commitRoles}
+          onBlur={commitRelationshipData}
           disabled={readOnly}
         />
       </label>
@@ -117,7 +147,7 @@ export function RelationshipInspector({ relationshipId }: RelationshipInspectorP
         <input
           value={targetRole}
           onChange={(e) => setTargetRole(e.target.value)}
-          onBlur={commitRoles}
+          onBlur={commitRelationshipData}
           disabled={readOnly}
         />
       </label>

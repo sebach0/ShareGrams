@@ -2,6 +2,7 @@ import type { UMLModel } from '../../model/types';
 import type {
   CreateRelationshipCommand,
   UpdateRelationshipCommand,
+  UpdateRelationshipLayoutCommand,
   DeleteRelationshipCommand,
   UpdateMultiplicityCommand,
   CommandResult,
@@ -44,6 +45,9 @@ export function createRelationship(model: UMLModel, command: CreateRelationshipC
         targetClassId: command.targetClassId,
         sourceMultiplicity: command.sourceMultiplicity,
         targetMultiplicity: command.targetMultiplicity,
+        name: command.name,
+        sourceAnchor: command.sourceAnchor,
+        targetAnchor: command.targetAnchor,
       },
     ],
   });
@@ -59,7 +63,32 @@ export function updateRelationship(model: UMLModel, command: UpdateRelationshipC
     ...model,
     relationships: model.relationships.map((r) =>
       r.id === command.relationshipId
-        ? { ...r, sourceRole: command.sourceRole, targetRole: command.targetRole }
+        ? { ...r, sourceRole: command.sourceRole, targetRole: command.targetRole, name: command.name }
+        : r,
+    ),
+  });
+}
+
+/** Merge parcial de verdad (ver el comentario del comando): un campo ausente deja el valor actual como estaba. */
+export function updateRelationshipLayout(model: UMLModel, command: UpdateRelationshipLayoutCommand): CommandResult {
+  const target = findRelationship(model, command.relationshipId);
+  if (!target) {
+    return fail('RELATIONSHIP_NOT_FOUND', `No existe una relación con id ${command.relationshipId}.`);
+  }
+
+  return ok({
+    ...model,
+    relationships: model.relationships.map((r) =>
+      r.id === command.relationshipId
+        ? {
+            ...r,
+            sourceAnchor: command.sourceAnchor ?? r.sourceAnchor,
+            targetAnchor: command.targetAnchor ?? r.targetAnchor,
+            sourceLabelOffset: command.sourceLabelOffset ?? r.sourceLabelOffset,
+            targetLabelOffset: command.targetLabelOffset ?? r.targetLabelOffset,
+            nameLabelOffset: command.nameLabelOffset ?? r.nameLabelOffset,
+            waypoints: command.waypoints ?? r.waypoints,
+          }
         : r,
     ),
   });

@@ -79,6 +79,30 @@ describe('exportToXmi', () => {
     );
   });
 
+  it('incluye el name de la asociación cuando está presente (dato UML real, ej. "Pertenece")', () => {
+    const model: UMLModel = {
+      classes: [
+        { id: 'c1', name: 'Alumno', position: { x: 0, y: 0 }, attributes: [] },
+        { id: 'c2', name: 'Colegio', position: { x: 200, y: 0 }, attributes: [] },
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          type: 'ASSOCIATION',
+          sourceClassId: 'c1',
+          targetClassId: 'c2',
+          sourceMultiplicity: { lower: 1, upper: 1 },
+          targetMultiplicity: { lower: 0, upper: '*' },
+          name: 'Pertenece',
+        },
+      ],
+    };
+
+    const xml = exportToXmi(model);
+
+    expect(xml).toContain('<packagedElement xmi:type="uml:Association" xmi:id="assoc_r1" name="Pertenece" memberEnd=');
+  });
+
   it('marca aggregation="composite" solo en el extremo de la parte (targetClassId) para COMPOSITION', () => {
     const model: UMLModel = {
       classes: [

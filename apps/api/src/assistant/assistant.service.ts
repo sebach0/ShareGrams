@@ -170,6 +170,8 @@ function describeCommand(command: Command): string {
       return `Creé una relación de tipo ${command.relationshipType}.`;
     case 'UPDATE_RELATIONSHIP':
       return 'Actualicé los roles de la relación.';
+    case 'UPDATE_RELATIONSHIP_LAYOUT':
+      return 'Actualicé la posición de la relación.';
     case 'DELETE_RELATIONSHIP':
       return 'Eliminé la relación.';
     case 'UPDATE_MULTIPLICITY':
