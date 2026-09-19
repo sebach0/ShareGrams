@@ -43,6 +43,8 @@ export interface UMLAttribute {
   id: string;
   name: string;
   type: PrimitiveType;
+  /** Marca explícita de clave primaria (Fase 9, transformación a modelo relacional). Ausente/false = no es PK. */
+  isPrimaryKey?: boolean;
 }
 
 export interface UMLClass {

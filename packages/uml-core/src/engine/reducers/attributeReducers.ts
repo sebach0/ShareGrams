@@ -31,7 +31,12 @@ export function addAttribute(model: UMLModel, command: AddAttributeCommand): Com
             ...c,
             attributes: [
               ...c.attributes,
-              { id: command.attributeId, name: command.name.trim(), type: command.attributeType },
+              {
+                id: command.attributeId,
+                name: command.name.trim(),
+                type: command.attributeType,
+                isPrimaryKey: command.isPrimaryKey,
+              },
             ],
           }
         : c,
@@ -63,7 +68,7 @@ export function updateAttribute(model: UMLModel, command: UpdateAttributeCommand
             ...c,
             attributes: c.attributes.map((a) =>
               a.id === command.attributeId
-                ? { ...a, name: command.name.trim(), type: command.attributeType }
+                ? { ...a, name: command.name.trim(), type: command.attributeType, isPrimaryKey: command.isPrimaryKey }
                 : a,
             ),
           }

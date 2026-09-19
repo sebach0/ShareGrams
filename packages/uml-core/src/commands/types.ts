@@ -30,6 +30,7 @@ export interface AddAttributeCommand {
   attributeId: string;
   name: string;
   attributeType: PrimitiveType;
+  isPrimaryKey?: boolean;
 }
 
 export interface UpdateAttributeCommand {
@@ -38,6 +39,7 @@ export interface UpdateAttributeCommand {
   attributeId: string;
   name: string;
   attributeType: PrimitiveType;
+  isPrimaryKey?: boolean;
 }
 
 export interface DeleteAttributeCommand {
