@@ -5,15 +5,17 @@ interface Props {
   url: string;
   manifest: DomainManifest;
   onDisconnect: () => void;
+  onSelectEntity: (entity: EntityDefinition) => void;
 }
 
 /**
- * Pantalla de diagnóstico (regla 31): SOLO muestra lo que se descubrió --
- * nada de formularios ni CRUD todavía (eso es Fase 13). Estas mismas
- * clases (ConnectScreen/DiscoveryScreen) no cambian entre un backend de
- * Ventas y uno de Clínica: lo único que cambia es el `manifest` que reciben.
+ * Punto de entrada a los datos de CUALQUIER backend descubierto (regla 31,
+ * ahora también puerta a Fase 13): las mismas clases (ConnectScreen/
+ * DiscoveryScreen) no cambian entre un backend de Ventas y uno de Clínica
+ * -- lo único que cambia es el `manifest` que reciben. Tocar una tarjeta
+ * navega a EntityRecordsScreen (lista + alta) para esa entidad.
  */
-export function DiscoveryScreen({ url, manifest, onDisconnect }: Props) {
+export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.appName}>{manifest.application.name}</Text>
@@ -21,7 +23,7 @@ export function DiscoveryScreen({ url, manifest, onDisconnect }: Props) {
 
       <Text style={styles.sectionTitle}>Entidades detectadas ({manifest.entities.length})</Text>
       {manifest.entities.map((entity) => (
-        <EntityCard key={entity.name} entity={entity} />
+        <EntityCard key={entity.name} entity={entity} onPress={() => onSelectEntity(entity)} />
       ))}
 
       <TouchableOpacity style={styles.disconnectButton} onPress={onDisconnect}>
@@ -31,9 +33,9 @@ export function DiscoveryScreen({ url, manifest, onDisconnect }: Props) {
   );
 }
 
-function EntityCard({ entity }: { entity: EntityDefinition }) {
+function EntityCard({ entity, onPress }: { entity: EntityDefinition; onPress: () => void }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <Text style={styles.entityName}>{entity.label}</Text>
       <Text style={styles.entityMeta}>{entity.endpoint} · {entity.operations.join(', ')}</Text>
 
@@ -54,7 +56,7 @@ function EntityCard({ entity }: { entity: EntityDefinition }) {
           → {relation.name} → {relation.targetEntity} ({relation.cardinality})
         </Text>
       ))}
-    </View>
+    </TouchableOpacity>
   );
 }
 
