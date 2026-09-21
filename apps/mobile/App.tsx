@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectScreen } from './src/screens/ConnectScreen';
 import { DiscoveryScreen } from './src/screens/DiscoveryScreen';
 import { EntityRecordsScreen } from './src/screens/EntityRecordsScreen';
@@ -28,24 +29,26 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      {state.status === 'connected' && view.kind === 'records' ? (
-        <EntityRecordsScreen baseUrl={state.url} manifest={state.manifest} entity={view.entity} onBack={() => setView({ kind: 'discovery' })} />
-      ) : state.status === 'connected' && view.kind === 'console' ? (
-        <CommandConsoleScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
-      ) : state.status === 'connected' ? (
-        <DiscoveryScreen
-          url={state.url}
-          manifest={state.manifest}
-          onDisconnect={handleDisconnect}
-          onSelectEntity={(entity) => setView({ kind: 'records', entity })}
-          onOpenConsole={() => setView({ kind: 'console' })}
-        />
-      ) : (
-        <ConnectScreen state={state} onConnect={connect} />
-      )}
-      <StatusBar style="auto" />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.root}>
+        {state.status === 'connected' && view.kind === 'records' ? (
+          <EntityRecordsScreen baseUrl={state.url} manifest={state.manifest} entity={view.entity} onBack={() => setView({ kind: 'discovery' })} />
+        ) : state.status === 'connected' && view.kind === 'console' ? (
+          <CommandConsoleScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
+        ) : state.status === 'connected' ? (
+          <DiscoveryScreen
+            url={state.url}
+            manifest={state.manifest}
+            onDisconnect={handleDisconnect}
+            onSelectEntity={(entity) => setView({ kind: 'records', entity })}
+            onOpenConsole={() => setView({ kind: 'console' })}
+          />
+        ) : (
+          <ConnectScreen state={state} onConnect={connect} />
+        )}
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
