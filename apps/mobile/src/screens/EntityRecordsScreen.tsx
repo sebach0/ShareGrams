@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { EntityRecord } from '../api/recordsClient';
+import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, EntityDefinition } from '../domain/manifest';
 import { useEntityRecords } from '../state/useEntityRecords';
 import { EntityCreateScreen } from './EntityCreateScreen';
@@ -41,7 +41,7 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props
             <Text style={styles.empty}>Todavía no hay {entity.pluralLabel.toLowerCase()}.</Text>
           )}
           {state.records.map((record, index) => (
-            <RecordCard key={String(idFieldName ? (record[idFieldName] ?? index) : index)} record={record} entity={entity} />
+            <RecordCard key={String(idFieldName ? (record.values[idFieldName] ?? index) : index)} record={record} entity={entity} />
           ))}
         </ScrollView>
       )}
@@ -68,8 +68,8 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props
   );
 }
 
-function RecordCard({ record, entity }: { record: EntityRecord; entity: EntityDefinition }) {
-  const title = String(record[entity.displayField] ?? '(sin nombre)');
+function RecordCard({ record, entity }: { record: DynamicEntity; entity: EntityDefinition }) {
+  const title = String(record.values[entity.displayField] ?? '(sin nombre)');
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{title}</Text>
@@ -77,7 +77,7 @@ function RecordCard({ record, entity }: { record: EntityRecord; entity: EntityDe
         .filter((field) => field.name !== entity.displayField)
         .map((field) => (
           <Text key={field.name} style={styles.cardLine}>
-            {field.label}: {formatValue(record[field.name])}
+            {field.label}: {formatValue(record.values[field.name])}
           </Text>
         ))}
     </View>

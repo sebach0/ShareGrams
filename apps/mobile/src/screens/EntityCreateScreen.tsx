@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { createRecord, type EntityRecord } from '../api/recordsClient';
+import { runDynamicCommand } from '../engine/runDynamicCommand';
+import { DynamicRepository } from '../engine/dynamicRepository';
+import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, EntityDefinition, FieldDefinition } from '../domain/manifest';
 import { RelationPicker } from '../components/RelationPicker';
 
@@ -8,7 +10,7 @@ interface Props {
   baseUrl: string;
   manifest: DomainManifest;
   entity: EntityDefinition;
-  onCreated: (record: EntityRecord) => void;
+  onCreated: (record: DynamicEntity) => void;
   onCancel: () => void;
 }
 
@@ -42,35 +44,29 @@ export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCan
   const handleSubmit = async () => {
     setError(null);
 
+    // Las validaciones de "required"/tipo/enum/relación NO se repiten acá a
+    // mano (regla 43): el mismo CommandValidator que corre para Claude en
+    // una fase futura es el que decide si esto se puede mandar o no. Solo
+    // se arma el `data` crudo; si falta algo, el Validator lo va a rechazar
+    // con un diagnóstico legible antes de tocar la red.
+    const data: Record<string, unknown> = {};
     for (const field of editableFields) {
-      if (field.required && !(values[field.name] ?? '').trim()) {
-        setError(`"${field.label}" es obligatorio.`);
-        return;
-      }
+      const value = coerceValue(values[field.name], field);
+      if (value !== null) data[field.name] = value;
     }
     for (const relation of editableRelations) {
-      if (relation.required && relationValues[relation.name] === undefined) {
-        setError(`Elegí un valor para "${relation.name}" antes de guardar.`);
-        return;
-      }
-    }
-
-    const body: EntityRecord = {};
-    for (const field of editableFields) {
-      body[field.name] = coerceValue(values[field.name], field);
-    }
-    for (const relation of editableRelations) {
-      if (relationValues[relation.name] !== undefined) body[relation.name] = relationValues[relation.name];
+      if (relationValues[relation.name] !== undefined) data[relation.name] = relationValues[relation.name];
     }
 
     setSubmitting(true);
-    const result = await createRecord(baseUrl, entity, body);
+    const repository = new DynamicRepository(baseUrl);
+    const result = await runDynamicCommand({ action: 'CREATE', entity: entity.name, data }, manifest, repository);
     setSubmitting(false);
 
-    if (result.ok) {
-      onCreated(result.record);
+    if (result.status === 'SUCCESS') {
+      onCreated(result.data as DynamicEntity);
     } else {
-      setError(result.error);
+      setError(result.diagnostics?.[0]?.message ?? result.message ?? 'No se pudo crear el registro.');
     }
   };
 

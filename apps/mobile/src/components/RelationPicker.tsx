@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { listRecords, type EntityRecord } from '../api/recordsClient';
+import { DynamicRepository, repositoryErrorMessage } from '../engine/dynamicRepository';
+import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, RelationDefinition } from '../domain/manifest';
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onSelect: (id: unknown) => void;
 }
 
-type PickerState = { status: 'loading' } | { status: 'loaded'; records: EntityRecord[] } | { status: 'error'; message: string };
+type PickerState = { status: 'loading' } | { status: 'loaded'; records: DynamicEntity[] } | { status: 'error'; message: string };
 
 /**
  * Selector para una relación MANY_TO_ONE/ONE_TO_ONE (ver EntityCreateScreen:
@@ -29,9 +30,10 @@ export function RelationPicker({ baseUrl, manifest, relation, selectedId, onSele
     let cancelled = false;
     setState({ status: 'loading' });
 
-    listRecords(baseUrl, targetEntity).then((result) => {
+    const repository = new DynamicRepository(baseUrl);
+    repository.list(targetEntity).then((result) => {
       if (cancelled) return;
-      setState(result.ok ? { status: 'loaded', records: result.records } : { status: 'error', message: result.error });
+      setState(result.kind === 'ok' ? { status: 'loaded', records: result.value } : { status: 'error', message: repositoryErrorMessage(result) });
     });
 
     return () => {
@@ -62,8 +64,8 @@ export function RelationPicker({ baseUrl, manifest, relation, selectedId, onSele
       {state.status === 'loaded' && state.records.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {state.records.map((record) => {
-            const id = record[idFieldName];
-            const label = String(record[targetEntity.displayField] ?? id);
+            const id = record.values[idFieldName];
+            const label = String(record.values[targetEntity.displayField] ?? id);
             const selected = selectedId === id;
             return (
               <TouchableOpacity
