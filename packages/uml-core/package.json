@@ -22,7 +22,8 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
-    "fast-xml-parser": "^4.5.0"
+    "fast-xml-parser": "^4.5.0",
+    "jszip": "^3.10.2"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

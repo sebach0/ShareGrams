@@ -21,6 +21,8 @@ Toda la lógica de traducción/resolución está cubierta por tests con el prove
 
 **Fase 11 (verificación integral del backend generado) — implementada; demuestra con ejecución real que el backend generado funciona.** Nueva infraestructura de pruebas E2E en `packages/uml-core/e2e/` (`npm run test:e2e` dentro de `packages/uml-core`, separada de la suite rápida): por cada fixture, genera un backend real, lo escribe a disco, lo compila y empaqueta con Maven, crea una base PostgreSQL aislada y descartable (no hay Docker/Testcontainers en este entorno — se documentó como adaptación, usando el PostgreSQL local real de la app, nunca H2), arranca el jar en un puerto libre, espera a que responda de verdad por HTTP, ejecuta un escenario CRUD/relacional completo contra la API, y limpia todo (proceso, base, directorio temporal) pase o falle el test. 5 fixtures (CRUD+1:N+nullable+errores+JSON, 1:1 con UNIQUE real, N:M, entidad asociativa con PK compuesta, los 8 tipos de dato soportados) + 27 tests, todos verdes. Este proceso encontró y corrigió 4 bugs reales de la Fase 10 (nunca detectados por los tests unitarios, que solo comprobaban el string generado, no la ejecución real): faltaba `@Transactional` en el Service (una colección `@ManyToMany` reemplazada en una entidad *detached* no se sincronizaba con la base), faltaban los imports `JoinColumn`/`Producto` en dos casos donde otro import "de suerte" los tapaba, y el `GlobalExceptionHandler` no manejaba violaciones de constraint de base de datos (devolvía 500 en vez de 409 ante un duplicado de UNIQUE o de PK compuesta).
 
+**Fase 12 (descubrimiento dinámico del backend) — implementada.** Objetivo: la app móvil no puede conocer de antemano qué entidades tiene un backend generado (Ventas ≠ Clínica ≠ Biblioteca). Se evaluó primero si el OpenAPI que ya genera Fase 10 alcanzaba — no: confirmado contra un backend real corriendo, `PedidoResponse.clienteId` aparece como `integer` sin ninguna marca de que es una FK, su cardinalidad, ni cuál campo es la PK. Se agregó un **Domain Manifest** versionado (`packages/uml-core/src/generator/manifest/`, `generateDomainManifest`), generado automáticamente a partir de `UMLModel` + `RelationalModel` (nunca a mano, nunca parseando el Java generado) y servido por todo backend generado en `GET /api/meta` (infraestructura de solo lectura, no una entidad — sin Repository/Service). El Manifest describe entidades, campos, tipos normalizados, PK, relaciones con cardinalidad explícita y operaciones realmente expuestas. Nueva app **`apps/mobile`** (React Native + Expo, TypeScript): pantalla de conexión (URL del backend) + pantalla de discovery (lista lo que encontró), sin CRUD ni formularios todavía (eso es Fase 13). Importa los tipos del Manifest directamente de `@sharegrams/uml-core` (sin duplicar el contrato). Prueba de aceptación real: el mismo mecanismo de descubrimiento (`GET /api/meta` + validación) descubre un backend de Ventas (Cliente, Pedido) y, sin recompilar nada, un backend de Clínica completamente distinto (Paciente, Médico, Consulta) — ambos compilados y corriendo de verdad. Limitación honesta: no hay emulador Android/navegador headless en este entorno de desarrollo, así que la confirmación visual en la UI de la app queda pendiente de una corrida manual; el mecanismo de descubrimiento en sí está probado de punta a punta contra backends reales.
+
 ## Estructura del repositorio
 
 ```
@@ -29,9 +31,14 @@ packages/
 apps/
   api/         # Backend NestJS + Prisma: auth, proyectos, diagramas, colaboración en tiempo real y asistente de IA
   web/         # Editor UML (React + Vite + React Flow + Zustand)
+  mobile/      # App de descubrimiento del backend generado (React Native + Expo, Fase 12)
 ```
 
 Regla de arquitectura: el canvas nunca modifica el modelo directamente. Toda mutación pasa por un `Command` (CREATE_CLASS, MOVE_CLASS, ADD_ATTRIBUTE, CREATE_RELATIONSHIP, UPDATE_MULTIPLICITY, etc.) que `uml-core` valida y aplica. Esta es la misma vía que usan el editor manual, la colaboración en tiempo real, el asistente de IA y el importador de imagen/XMI (que arman un batch de comandos y lo aplican con el mismo dispatch, tras una vista previa), y la que va a reutilizar el generador de Spring Boot en fases posteriores.
+
+## Despliegue en AWS
+
+Runbook completo (EC2 + RDS, sin Docker) en [`infra/aws/README.md`](infra/aws/README.md).
 
 ## Cómo correr el proyecto
 

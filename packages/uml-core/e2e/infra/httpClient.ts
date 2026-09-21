@@ -1,6 +1,7 @@
 export interface ApiResponse<T> {
   status: number;
   body: T;
+  headers: Headers;
 }
 
 /** Wrapper fino sobre fetch: nada de lógica propia, solo evita repetir `res.json()`/manejo de status en cada escenario. */
@@ -9,7 +10,7 @@ export class ApiClient {
 
   async get<T>(path: string): Promise<ApiResponse<T>> {
     const res = await fetch(`${this.baseUrl}${path}`);
-    return { status: res.status, body: await parseBody<T>(res) };
+    return { status: res.status, body: await parseBody<T>(res), headers: res.headers };
   }
 
   async post<T>(path: string, payload: unknown): Promise<ApiResponse<T>> {
@@ -18,7 +19,7 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return { status: res.status, body: await parseBody<T>(res) };
+    return { status: res.status, body: await parseBody<T>(res), headers: res.headers };
   }
 
   async put<T>(path: string, payload: unknown): Promise<ApiResponse<T>> {
@@ -27,12 +28,12 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return { status: res.status, body: await parseBody<T>(res) };
+    return { status: res.status, body: await parseBody<T>(res), headers: res.headers };
   }
 
   async delete<T>(path: string): Promise<ApiResponse<T>> {
     const res = await fetch(`${this.baseUrl}${path}`, { method: 'DELETE' });
-    return { status: res.status, body: await parseBody<T>(res) };
+    return { status: res.status, body: await parseBody<T>(res), headers: res.headers };
   }
 }
 

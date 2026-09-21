@@ -1,4 +1,5 @@
 import type { RelationalModel, RelationalTable } from '../../../relational/types';
+import { isPureJoinTable } from '../../../relational/associativeTables';
 import type { SpringBootGenerationOptions } from '../types';
 import { generationError, type GenerationError } from '../errors';
 import { validateForGeneration } from '../validate';
@@ -21,18 +22,6 @@ export function buildGenerationContext(model: RelationalModel, options: SpringBo
   if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
 
   const tableByName = new Map(model.tables.map((t) => [t.name, t]));
-
-  // Tabla asociativa "pura" (Escenario A de la consigna): origin many-to-many
-  // y exactamente las 2 columnas FK que forman toda su PK -- no genera
-  // Entity propia, se resuelve como @ManyToMany + @JoinTable en el lado
-  // "source" (el que Fase 9 ya fijó como dueño al nombrar la tabla
-  // "<source>_<target>"). Si en algún momento Fase 9 empieza a producir
-  // tablas asociativas con columnas propias (Escenario B, AssociationClass),
-  // dejan de cumplir este `columns.length === 2` y automáticamente pasan a
-  // generarse como Entity real más abajo -- sin perder sus atributos.
-  function isPureJoinTable(table: RelationalTable): boolean {
-    return table.origin.kind === 'many-to-many' && table.columns.length === 2;
-  }
 
   // classIndex.get(tableName): permite resolver, dado el nombre de una
   // tabla, si es raíz o subtipo (para herencia) y quién es su padre.

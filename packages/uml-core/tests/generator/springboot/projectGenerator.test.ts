@@ -97,6 +97,13 @@ describe('proyecto mínimo', () => {
     const props = findFile(project, 'src/main/resources/application.properties').content;
     expect(props).toContain('server.port=${SERVER_PORT:8080}');
   });
+
+  it('regresión: genera CORS permisivo -- sin esto, un cliente en otro origen (ej. la app móvil en modo web) no puede leer ninguna respuesta del backend generado', () => {
+    const project = expectOk(generateSpringBootProject({ tables: [] }));
+    const config = findFile(project, 'src/main/java/com/sharegrams/generated/config/WebConfig.java').content;
+    expect(config).toContain('addCorsMappings');
+    expect(config).toContain('allowedOriginPatterns("*")');
+  });
 });
 
 describe('manejo de errores', () => {
@@ -375,6 +382,47 @@ describe('caso de aceptación: Cliente / Pedido / Producto + pedido_producto', (
       'src/main/java/com/sharegrams/generated/model/Pedido.java',
       'src/main/java/com/sharegrams/generated/model/Producto.java',
     ]);
-    expect(paths.filter((p) => p.includes('/controller/'))).toHaveLength(3);
+    // 3 controllers de entidad (Cliente/Pedido/Producto) + MetaController (Fase 12, infraestructura de /api/meta, no una entidad).
+    expect(paths.filter((p) => p.includes('/controller/'))).toHaveLength(4);
+    expect(paths).toContain('src/main/java/com/sharegrams/generated/controller/MetaController.java');
+    expect(paths).toContain('src/main/resources/manifest.json');
+  });
+});
+
+describe('Fase 12: endpoint /api/meta', () => {
+  it('MetaController expone GET /api/meta y lee manifest.json como recurso -- no es una entidad (sin Repository/Service)', () => {
+    const project = expectOk(generateSpringBootProject({ tables: [clienteTable] }));
+    const controller = findFile(project, 'src/main/java/com/sharegrams/generated/controller/MetaController.java').content;
+    expect(controller).toContain('@GetMapping("/api/meta")');
+    expect(controller).toContain('new ClassPathResource("manifest.json")');
+    expect(project.files.some((f) => f.path.includes('MetaRepository'))).toBe(false);
+    expect(project.files.some((f) => f.path.includes('MetaService'))).toBe(false);
+  });
+
+  it('manifest.json es JSON válido, versionado, y describe las entidades reales del proyecto', () => {
+    const project = expectOk(generateSpringBootProject({ tables: [clienteTable, pedidoTable] }));
+    const manifest = JSON.parse(findFile(project, 'src/main/resources/manifest.json').content);
+    expect(manifest.version).toBe('1.0');
+    expect(manifest.entities.map((e: { name: string }) => e.name).sort()).toEqual(['Cliente', 'Pedido']);
+  });
+
+  it('sin UMLModel de origen, cae a un label humanizado del nombre de tabla (no rompe la generación)', () => {
+    const project = expectOk(generateSpringBootProject({ tables: [clienteTable] }));
+    const manifest = JSON.parse(findFile(project, 'src/main/resources/manifest.json').content);
+    expect(manifest.entities[0].label).toBe('Cliente');
+  });
+
+  it('con UMLModel de origen, usa el nombre original de la clase como label (no el humanizado)', () => {
+    const clienteVipTable: RelationalTable = {
+      ...clienteTable,
+      id: 'cliente_vip',
+      name: 'cliente_vip',
+      origin: { kind: 'class', classId: 'cliente_vip' },
+    };
+    const umlModel = { classes: [{ id: 'cliente_vip', name: 'ClienteVIP', attributes: [], position: { x: 0, y: 0 } }], relationships: [] };
+    const project = expectOk(generateSpringBootProject({ tables: [clienteVipTable] }, DEFAULT_GENERATION_OPTIONS, umlModel));
+    const manifest = JSON.parse(findFile(project, 'src/main/resources/manifest.json').content);
+    // Humanizar "cliente_vip" daría "Cliente Vip" -- el label real, "ClienteVIP", solo puede venir del UMLModel.
+    expect(manifest.entities[0].label).toBe('ClienteVIP');
   });
 });

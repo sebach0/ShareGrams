@@ -1,3 +1,4 @@
+import type { UMLModel } from '../../src/model/types';
 import type { RelationalModel } from '../../src/relational/types';
 import { generateSpringBootProject } from '../../src/generator/springboot/projectGenerator';
 import type { SpringBootGenerationOptions } from '../../src/generator/springboot/types';
@@ -10,6 +11,7 @@ import { ApiClient } from './httpClient';
 
 export interface RunningGeneratedBackend {
   client: ApiClient;
+  baseUrl: string;
   db: TestDatabase;
   projectDir: string;
   /** Detiene el proceso Java, borra la base de datos de prueba y borra el proyecto temporal. Idempotente-safe: siempre debe llamarse en un finally del test (regla 14), nunca queda nada colgado si un assert falla antes. */
@@ -32,8 +34,9 @@ export async function startGeneratedBackend(
   model: RelationalModel,
   readinessPath: string,
   options?: SpringBootGenerationOptions,
+  umlModel?: UMLModel,
 ): Promise<RunningGeneratedBackend> {
-  const genResult = generateSpringBootProject(model, options);
+  const genResult = generateSpringBootProject(model, options, umlModel);
   if (!genResult.ok) {
     throw new Error(`GENERATION_FAILED\n${genResult.errors.map((e) => `${e.code}: ${e.message}`).join('\n')}`);
   }
@@ -61,6 +64,7 @@ export async function startGeneratedBackend(
 
     return {
       client: new ApiClient(app.baseUrl),
+      baseUrl: app.baseUrl,
       db,
       projectDir,
       stop() {

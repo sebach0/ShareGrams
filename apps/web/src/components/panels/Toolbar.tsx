@@ -4,6 +4,7 @@ import { useUmlStore } from '../../store/useUmlStore';
 import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
 import { ImageImportDialog } from '../image-import/ImageImportDialog';
 import { XmiImportDialog } from '../xmi-import/XmiImportDialog';
+import { GenerateBackendDialog } from '../generate-backend/GenerateBackendDialog';
 
 function nextClassName(existingNames: string[]): string {
   const normalized = existingNames.map((n) => n.toLowerCase());
@@ -37,6 +38,7 @@ export function Toolbar({ diagramId, diagramName }: ToolbarProps) {
   const [importFile, setImportFile] = useState<File | null>(null);
   const xmiInputRef = useRef<HTMLInputElement>(null);
   const [importXmiFile, setImportXmiFile] = useState<File | null>(null);
+  const [showGenerateBackend, setShowGenerateBackend] = useState(false);
 
   const handleAddClass = () => {
     const name = nextClassName(model.classes.map((c) => c.name));
@@ -105,11 +107,17 @@ export function Toolbar({ diagramId, diagramName }: ToolbarProps) {
       <button type="button" onClick={handleExportXmi} disabled={model.classes.length === 0}>
         ⬇ Exportar XMI
       </button>
+      <button type="button" onClick={() => setShowGenerateBackend(true)} disabled={model.classes.length === 0}>
+        ⚙ Generar Backend
+      </button>
       {readOnly && <span className="toolbar__readonly">Solo lectura</span>}
       {importFile && (
         <ImageImportDialog diagramId={diagramId} file={importFile} onClose={() => setImportFile(null)} />
       )}
       {importXmiFile && <XmiImportDialog file={importXmiFile} onClose={() => setImportXmiFile(null)} />}
+      {showGenerateBackend && (
+        <GenerateBackendDialog model={model} diagramName={diagramName} onClose={() => setShowGenerateBackend(false)} />
+      )}
     </header>
   );
 }

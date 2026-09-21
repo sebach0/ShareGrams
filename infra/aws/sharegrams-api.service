@@ -1,0 +1,15 @@
+[Unit]
+Description=ShareGrams API (NestJS)
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/sharegrams/apps/api
+EnvironmentFile=/home/ec2-user/sharegrams/apps/api/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

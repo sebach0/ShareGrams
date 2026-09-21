@@ -11,9 +11,10 @@ interface ClassInspectorProps {
 interface AttributeRowProps {
   classId: string;
   attribute: UMLAttribute;
+  onTogglePrimaryKey: (attribute: UMLAttribute) => void;
 }
 
-function AttributeRow({ classId, attribute }: AttributeRowProps) {
+function AttributeRow({ classId, attribute, onTogglePrimaryKey }: AttributeRowProps) {
   const dispatch = useCollabDispatch();
   const readOnly = useIsReadOnly();
   const [name, setName] = useState(attribute.name);
@@ -29,12 +30,23 @@ function AttributeRow({ classId, attribute }: AttributeRowProps) {
         attributeId: attribute.id,
         name: finalName,
         attributeType: finalType,
+        isPrimaryKey: attribute.isPrimaryKey,
       });
     }
   };
 
   return (
     <li className="inspector__attribute-row">
+      <button
+        type="button"
+        className={`inspector__pk-toggle${attribute.isPrimaryKey ? ' inspector__pk-toggle--active' : ''}`}
+        aria-label={attribute.isPrimaryKey ? 'Quitar como clave primaria' : 'Marcar como clave primaria'}
+        title={attribute.isPrimaryKey ? 'Clave primaria (click para quitar)' : 'Marcar como clave primaria'}
+        onClick={() => onTogglePrimaryKey(attribute)}
+        disabled={readOnly}
+      >
+        🔑
+      </button>
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -87,6 +99,33 @@ export function ClassInspector({ classId }: ClassInspectorProps) {
     }
   };
 
+  // Solo una PK por clase (regla de Fase 9): marcar una desmarca cualquier otra que ya estuviera activa en la misma clase, así el usuario nunca termina con dos sin darse cuenta.
+  const handleTogglePrimaryKey = (attribute: UMLAttribute) => {
+    const turningOn = !attribute.isPrimaryKey;
+    if (turningOn) {
+      for (const other of umlClass.attributes) {
+        if (other.id !== attribute.id && other.isPrimaryKey) {
+          dispatch({
+            type: 'UPDATE_ATTRIBUTE',
+            classId: umlClass.id,
+            attributeId: other.id,
+            name: other.name,
+            attributeType: other.type,
+            isPrimaryKey: false,
+          });
+        }
+      }
+    }
+    dispatch({
+      type: 'UPDATE_ATTRIBUTE',
+      classId: umlClass.id,
+      attributeId: attribute.id,
+      name: attribute.name,
+      attributeType: attribute.type,
+      isPrimaryKey: turningOn,
+    });
+  };
+
   const handleAddAttribute = () => {
     if (!newAttrName.trim()) return;
     const success = dispatch({
@@ -119,7 +158,12 @@ export function ClassInspector({ classId }: ClassInspectorProps) {
       <h4>Atributos</h4>
       <ul className="inspector__attribute-list">
         {umlClass.attributes.map((attribute) => (
-          <AttributeRow key={attribute.id} classId={umlClass.id} attribute={attribute} />
+          <AttributeRow
+            key={attribute.id}
+            classId={umlClass.id}
+            attribute={attribute}
+            onTogglePrimaryKey={handleTogglePrimaryKey}
+          />
         ))}
       </ul>
 

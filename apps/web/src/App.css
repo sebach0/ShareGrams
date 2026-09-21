@@ -321,6 +321,20 @@
   min-width: 0;
 }
 
+.inspector__pk-toggle {
+  opacity: 0.25;
+  filter: grayscale(1);
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.inspector__pk-toggle--active {
+  opacity: 1;
+  filter: none;
+  border-color: #f97316;
+}
+
 .inspector__new-attribute {
   display: flex;
   gap: 0.3rem;

@@ -1,3 +1,4 @@
+import type { UMLModel } from '../../model/types';
 import type { RelationalModel } from '../../relational/types';
 import { buildGenerationContext } from './context/buildGenerationContext';
 import type { GenerationError } from './errors';
@@ -15,6 +16,10 @@ import { renderApplicationProperties } from './templates/applicationConfig.templ
 import { renderPom } from './templates/pom.template';
 import { renderReadme } from './templates/readme.template';
 import { renderGitignore } from './templates/gitignore.template';
+import { renderMetaController } from './templates/metaController.template';
+import { renderWebConfig } from './templates/webConfig.template';
+import { generateDomainManifest } from '../manifest/manifestGenerator';
+import { humanizeLabel } from '../manifest/labels';
 
 export type GenerateProjectResult = { ok: true; project: GeneratedProject } | { ok: false; errors: GenerationError[] };
 
@@ -28,6 +33,10 @@ export type GenerateProjectResult = { ok: true; project: GeneratedProject } | { 
 export function generateSpringBootProject(
   model: RelationalModel,
   options: SpringBootGenerationOptions = DEFAULT_GENERATION_OPTIONS,
+  // Solo hace falta para el Manifest (Fase 12): nombres/labels originales que el modelo relacional no conserva.
+  // Opcional y al final a propósito -- no rompe ninguna llamada existente (varios fixtures de Fase 11 arman
+  // un RelationalModel a mano, sin UMLModel de origen; ahí el Manifest cae al label humanizado del nombre de tabla).
+  umlModel?: UMLModel,
 ): GenerateProjectResult {
   const contextResult = buildGenerationContext(model, options);
   if (!contextResult.ok) return { ok: false, errors: contextResult.errors };
@@ -37,13 +46,20 @@ export function generateSpringBootProject(
   const javaRoot = `src/main/java/${packagePath}`;
   const files: GeneratedFile[] = [];
 
+  const manifest = generateDomainManifest(umlModel ?? { classes: [], relationships: [] }, model, {
+    applicationName: humanizeLabel(options.projectName),
+  });
+
   files.push({ path: 'pom.xml', content: renderPom(options) });
   files.push({ path: 'README.md', content: renderReadme(options) });
   files.push({ path: '.gitignore', content: renderGitignore() });
   files.push({ path: 'src/main/resources/application.properties', content: renderApplicationProperties(options.databaseName) });
+  files.push({ path: 'src/main/resources/manifest.json', content: JSON.stringify(manifest, null, 2) });
   files.push({ path: `${javaRoot}/${mainClassName(options.projectName)}.java`, content: renderMainClass(context.packageName, options.projectName) });
   files.push({ path: `${javaRoot}/exception/ResourceNotFoundException.java`, content: renderResourceNotFoundException(context.packageName) });
   files.push({ path: `${javaRoot}/exception/GlobalExceptionHandler.java`, content: renderGlobalExceptionHandler(context.packageName) });
+  files.push({ path: `${javaRoot}/controller/MetaController.java`, content: renderMetaController(context.packageName) });
+  files.push({ path: `${javaRoot}/config/WebConfig.java`, content: renderWebConfig(context.packageName) });
 
   for (const entity of context.entities) {
     files.push({ path: `${javaRoot}/model/${entity.className}.java`, content: renderEntity(context.packageName, entity) });

@@ -21,3 +21,7 @@ export * from './generator/springboot/validate';
 export * from './generator/springboot/context/types';
 export * from './generator/springboot/context/buildGenerationContext';
 export * from './generator/springboot/projectGenerator';
+export * from './generator/springboot/zipExport';
+export * from './generator/manifest/types';
+export * from './generator/manifest/domainTypeMapper';
+export * from './generator/manifest/manifestGenerator';

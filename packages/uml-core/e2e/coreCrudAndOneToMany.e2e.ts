@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startGeneratedBackend, type RunningGeneratedBackend } from './infra/pipeline';
-import { coreCrudAndOneToManyRelationalModel } from './fixtures/coreCrudAndOneToMany';
+import { buildCoreCrudAndOneToManyModel, coreCrudAndOneToManyRelationalModel } from './fixtures/coreCrudAndOneToMany';
 
 /**
  * Fixture 1: Cliente (CRUD completo) + Pedido (1:N, FK nullable). Un solo
@@ -13,7 +13,12 @@ describe('E2E: Cliente/Pedido (CRUD, 1:N, nullable, errores, JSON)', () => {
   let clienteId: number;
 
   beforeAll(async () => {
-    backend = await startGeneratedBackend(coreCrudAndOneToManyRelationalModel(), '/api/clientes');
+    backend = await startGeneratedBackend(
+      coreCrudAndOneToManyRelationalModel(),
+      '/api/clientes',
+      undefined,
+      buildCoreCrudAndOneToManyModel(),
+    );
   });
 
   afterAll(() => {
@@ -132,5 +137,26 @@ describe('E2E: Cliente/Pedido (CRUD, 1:N, nullable, errores, JSON)', () => {
     const res = await backend.client.get<{ paths: Record<string, unknown> }>('/v3/api-docs');
     expect(res.status).toBe(200);
     expect(Object.keys(res.body.paths)).toEqual(expect.arrayContaining(['/api/clientes', '/api/clientes/{id}']));
+  });
+
+  it('Fase 12: GET /api/meta devuelve el Domain Manifest real -- JSON válido, versionado, con Cliente y Pedido y la relación 1:N', async () => {
+    const res = await backend.client.get<{
+      version: string;
+      application: { name: string };
+      entities: Array<{ name: string; relations: Array<{ name: string; targetEntity: string; cardinality: string; required: boolean }> }>;
+    }>('/api/meta');
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe('1.0');
+    const names = res.body.entities.map((e) => e.name).sort();
+    expect(names).toEqual(['Cliente', 'Pedido']);
+    const pedido = res.body.entities.find((e) => e.name === 'Pedido')!;
+    // required:false porque el fixture usa Cliente 0..1 (ver coreCrudAndOneToMany.ts) -- cliente_id es nullable de verdad.
+    expect(pedido.relations).toEqual([{ name: 'clienteId', targetEntity: 'Cliente', cardinality: 'MANY_TO_ONE', required: false }]);
+  });
+
+  it('CORS: la respuesta trae Access-Control-Allow-Origin -- regresión de un bug real (encontrado probando la app móvil en el navegador: sin esto, un cliente en otro origen nunca puede leer la respuesta aunque el backend responda 200)', async () => {
+    const res = await fetch(`${backend.baseUrl}/api/meta`, { headers: { Origin: 'http://localhost:8081' } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeTruthy();
   });
 });
