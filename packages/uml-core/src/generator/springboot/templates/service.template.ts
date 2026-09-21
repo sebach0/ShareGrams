@@ -6,6 +6,26 @@ function repoFieldName(entity: JavaEntityModel): string {
 }
 
 /**
+ * Nombre real del campo de PK de una entidad -- NUNCA asumir "id" (bug real
+ * encontrado en producción: un usuario nombró su atributo de PK "ci", y el
+ * código de acá abajo llamaba `Estudiante::getId` a mano, que no compila
+ * porque el getter generado es `getCi()`). Para 'inherited' (JOINED),
+ * resuelve hasta la raíz -- ahí vive el @Id real, vía herencia Java.
+ */
+function resolveIdFieldName(entity: JavaEntityModel, allEntities: JavaEntityModel[]): string {
+  if (entity.primaryKey.kind === 'simple') return entity.primaryKey.field.fieldName;
+  if (entity.primaryKey.kind === 'inherited') {
+    const primaryKey = entity.primaryKey;
+    const parent = allEntities.find((e) => e.className === primaryKey.parentClassName)!;
+    return resolveIdFieldName(parent, allEntities);
+  }
+  // 'embedded' (PK compuesta): no hay un único campo id -- no debería llegar
+  // acá nunca (una entidad con PK compuesta no puede ser blanco de una
+  // relación a-uno/@ManyToMany hoy, ver limitación documentada de Fase 10).
+  throw new Error(`service.template: no se puede resolver un id simple para "${entity.className}" (PK compuesta).`);
+}
+
+/**
  * Capa de servicio: CRUD mínimo (findAll/findById/create/update/delete),
  * inyección por constructor (regla 13), y un update "seguro" (regla 14):
  * busca la entidad existente, aplica los campos permitidos del Request y
@@ -77,25 +97,32 @@ export function renderService(packageName: string, entity: JavaEntityModel, allE
     const p = toPropertyName(entity.primaryKey.field.fieldName);
     toResponseAssignments.push(`        response.set${p}(entity.get${p}());`);
   } else if (entity.primaryKey.kind === 'inherited') {
-    // El getter del id lo hereda de la superclase (misma jerarquía Java) -- se llama igual que en la raíz.
-    toResponseAssignments.push(`        response.setId(entity.getId());`);
+    // El getter del id lo hereda de la superclase (misma jerarquía Java) -- se llama
+    // como el campo real de la raíz (no necesariamente "id").
+    const rootP = toPropertyName(resolveIdFieldName(entity, allEntities));
+    toResponseAssignments.push(`        response.set${rootP}(entity.get${rootP}());`);
   }
   for (const field of entity.scalarFields) {
     const p = toPropertyName(field.fieldName);
     toResponseAssignments.push(`        response.set${p}(entity.get${p}());`);
   }
-  for (const rel of entity.relationships) {
+  for (let i = 0; i < entity.relationships.length; i += 1) {
+    const rel = entity.relationships[i];
+    const target = relationshipTargets[i];
     const p = toPropertyName(rel.fieldName);
     const idProp = toPropertyName(`${rel.fieldName}Id`);
+    const targetIdGetter = `get${toPropertyName(resolveIdFieldName(target, allEntities))}`;
     toResponseAssignments.push(
-      `        response.set${idProp}(entity.get${p}() == null ? null : entity.get${p}().getId());`,
+      `        response.set${idProp}(entity.get${p}() == null ? null : entity.get${p}().${targetIdGetter}());`,
     );
   }
   for (const m2m of entity.manyToMany) {
+    const target = allEntities.find((e) => e.className === m2m.targetClassName)!;
     const p = toPropertyName(m2m.fieldName);
     const idsProp = toPropertyName(`${m2m.fieldName}Ids`);
+    const targetIdGetter = `get${toPropertyName(resolveIdFieldName(target, allEntities))}`;
     toResponseAssignments.push(
-      `        response.set${idsProp}(entity.get${p}().stream().map(${m2m.targetClassName}::getId).collect(Collectors.toSet()));`,
+      `        response.set${idsProp}(entity.get${p}().stream().map(${m2m.targetClassName}::${targetIdGetter}).collect(Collectors.toSet()));`,
     );
   }
 

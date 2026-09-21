@@ -258,6 +258,45 @@ describe('tabla asociativa N:M pura', () => {
     expect(service).toContain('import org.springframework.transaction.annotation.Transactional;');
     expect(service).toContain('@Transactional');
   });
+
+  it('regresión: el getter del id de una entidad relacionada NO siempre se llama getId() (bug real: un usuario nombró su PK "ci")', () => {
+    // Mismo caso que rompió un backend real generado por un usuario: Producto
+    // con su columna de PK llamada "codigo" en vez de "id" -- tanto el lado
+    // @ManyToOne (Pedido -> Cliente) como el @ManyToMany (Pedido -> Producto)
+    // necesitan el getter REAL del target, no un "getId()" hardcodeado.
+    const clienteConCodigo: RelationalTable = {
+      ...clienteTable,
+      columns: clienteTable.columns.map((c) => (c.name === 'id' ? { ...c, id: 'c-codigo', name: 'codigo' } : c)),
+      primaryKey: { columns: ['codigo'] },
+    };
+    const productoConCodigo: RelationalTable = {
+      ...productoTable,
+      columns: productoTable.columns.map((c) => (c.name === 'id' ? { ...c, id: 'pr-codigo', name: 'codigo' } : c)),
+      primaryKey: { columns: ['codigo'] },
+    };
+    const pedidoTableFixed: RelationalTable = {
+      ...pedidoTable,
+      foreignKeys: [{ id: 'r1:fk', columns: ['cliente_id'], referencedTable: 'cliente', referencedColumns: ['codigo'] }],
+    };
+    const joinTableFixed: RelationalTable = {
+      ...pedidoProductoJoinTable,
+      foreignKeys: [
+        { id: 'r2:source-fk', columns: ['pedido_id'], referencedTable: 'pedido', referencedColumns: ['id'] },
+        { id: 'r2:target-fk', columns: ['producto_id'], referencedTable: 'producto', referencedColumns: ['codigo'] },
+      ],
+    };
+
+    const project = expectOk(generateSpringBootProject({ tables: [clienteConCodigo, pedidoTableFixed, productoConCodigo, joinTableFixed] }));
+    const service = findFile(project, 'src/main/java/com/sharegrams/generated/service/PedidoService.java').content;
+
+    // @ManyToOne: entity.getCliente().getCodigo(), NO .getId()
+    expect(service).toContain('response.setClienteId(entity.getCliente() == null ? null : entity.getCliente().getCodigo());');
+    expect(service).not.toContain('.getCliente().getId()');
+
+    // @ManyToMany: Producto::getCodigo, NO Producto::getId
+    expect(service).toContain('response.setProductosIds(entity.getProductos().stream().map(Producto::getCodigo).collect(Collectors.toSet()));');
+    expect(service).not.toContain('Producto::getId');
+  });
 });
 
 describe('primary key compuesta (tabla asociativa con atributos propios)', () => {
