@@ -5,6 +5,17 @@ import { isValidJavaPackageName } from './naming';
 import { mapRelationalTypeToJava } from './javaTypeMapper';
 
 /**
+ * entity.template.ts genera siempre @GeneratedValue(strategy =
+ * GenerationType.IDENTITY) para una PK simple -- Postgres exige que una
+ * columna IDENTITY sea numérica (smallint/integer/bigint). Bug real
+ * encontrado en producción: un usuario marcó el atributo PK de una clase
+ * como String, la tabla nunca se creó (falló el DDL) y cada request a esa
+ * entidad tiraba 500. Se valida ACÁ, antes de generar nada, en vez de dejar
+ * que el usuario se entere recién cuando intenta correr el backend.
+ */
+const IDENTITY_COMPATIBLE_JAVA_TYPES = new Set(['Integer', 'Long']);
+
+/**
  * La Fase 9 ya valida su propio resultado -- esto NO repite ese motor.
  * Son solo los invariantes que hacen falta para poder generar Java
  * correctamente, por si un RelationalModel llega de otro lado (no
@@ -53,6 +64,23 @@ export function validateForGeneration(model: RelationalModel, options: SpringBoo
       if (!tableNames.has(fk.referencedTable)) {
         errors.push(
           generationError('INVALID_FOREIGN_KEY', `La FK "${t.name}.${fk.columns.join(',')}" referencia la tabla inexistente "${fk.referencedTable}".`),
+        );
+      }
+    }
+
+    // Una tabla hija de herencia JOINED no declara @GeneratedValue propio
+    // (hereda el id real de la raíz vía Java `extends`) -- esta regla solo
+    // aplica a la PK que el generador SÍ autogenera con IDENTITY.
+    const isGeneralizationChild = t.columns.some((c) => c.origin.kind === 'generalization-fk');
+    if (!isGeneralizationChild && t.primaryKey && t.primaryKey.columns.length === 1) {
+      const pkColumn = t.columns.find((c) => c.name === t.primaryKey!.columns[0]);
+      const javaType = pkColumn ? mapRelationalTypeToJava(pkColumn.type) : null;
+      if (pkColumn && javaType && !IDENTITY_COMPATIBLE_JAVA_TYPES.has(javaType.name)) {
+        errors.push(
+          generationError(
+            'UNSUPPORTED_PRIMARY_KEY_TYPE',
+            `La clave primaria de "${t.name}" ("${pkColumn.name}") es de tipo ${javaType.name} -- el generador solo puede autogenerar claves primarias numéricas (Integer/Long). Cambiá el tipo del atributo a Long, o no lo marques como clave primaria.`,
+          ),
         );
       }
     }

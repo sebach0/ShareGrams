@@ -157,6 +157,14 @@ describe('primary key simple', () => {
     expect(entity).toContain('@GeneratedValue(strategy = GenerationType.IDENTITY)');
     expect(entity).toContain('private Long id;');
   });
+
+  it('regresión: rechaza una PK de tipo String -- Postgres no permite IDENTITY en columnas no numéricas (bug real: tabla nunca se creaba, 500 en cada request)', () => {
+    const clienteConPkString: RelationalTable = {
+      ...clienteTable,
+      columns: clienteTable.columns.map((c) => (c.name === 'id' ? { ...c, type: 'VARCHAR' } : c)),
+    };
+    expectFail(generateSpringBootProject({ tables: [clienteConPkString] }), 'UNSUPPORTED_PRIMARY_KEY_TYPE');
+  });
 });
 
 describe('foreign key many-to-one', () => {
