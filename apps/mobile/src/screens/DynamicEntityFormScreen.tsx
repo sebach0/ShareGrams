@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
 import { DynamicRepository } from '../engine/dynamicRepository';
 import type { DynamicEntity } from '../engine/dynamicEntity';
+import type { DynamicId } from '../engine/dynamicCommand';
 import type { DomainManifest, EntityDefinition, FieldDefinition } from '../domain/manifest';
 import { RelationPicker } from '../components/RelationPicker';
 
@@ -10,12 +12,14 @@ interface Props {
   baseUrl: string;
   manifest: DomainManifest;
   entity: EntityDefinition;
-  onCreated: (record: DynamicEntity) => void;
+  /** Ausente = CREATE; presente = EDIT, precarga el formulario con sus valores (regla 15-17: mismo componente, no dos formularios separados). */
+  initialRecord?: DynamicEntity;
+  onSaved: (record: DynamicEntity) => void;
   onCancel: () => void;
 }
 
 /**
- * MVP de Fase 13 (confirmado con el usuario): solo relaciones simples
+ * MVP de Fase 13/14 (confirmado con el usuario): solo relaciones simples
  * (MANY_TO_ONE/ONE_TO_ONE, un único id) tienen selector acá. ONE_TO_MANY y
  * MANY_TO_MANY quedan afuera de este formulario -- se listan como nota, no
  * se ocultan en silencio (mismo criterio que las limitaciones documentadas
@@ -23,7 +27,29 @@ interface Props {
  */
 const EDITABLE_RELATION_CARDINALITIES = new Set(['MANY_TO_ONE', 'ONE_TO_ONE']);
 
-export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCancel }: Props) {
+function initialTextValues(entity: EntityDefinition, record: DynamicEntity | undefined): Record<string, string> {
+  if (!record) return {};
+  const values: Record<string, string> = {};
+  for (const field of entity.fields) {
+    const raw = record.values[field.name];
+    if (raw !== undefined && raw !== null) values[field.name] = field.type === 'boolean' ? String(raw) : String(raw);
+  }
+  return values;
+}
+
+function initialRelationValues(entity: EntityDefinition, record: DynamicEntity | undefined): Record<string, unknown> {
+  if (!record) return {};
+  const values: Record<string, unknown> = {};
+  for (const relation of entity.relations) {
+    const raw = record.values[relation.name];
+    if (raw !== undefined && raw !== null) values[relation.name] = raw;
+  }
+  return values;
+}
+
+export function DynamicEntityFormScreen({ baseUrl, manifest, entity, initialRecord, onSaved, onCancel }: Props) {
+  const mode: 'create' | 'edit' = initialRecord ? 'edit' : 'create';
+
   const editableFields = useMemo(() => entity.fields.filter((f) => f.editable && !f.generated), [entity]);
   const editableRelations = useMemo(
     () => entity.relations.filter((r) => EDITABLE_RELATION_CARDINALITIES.has(r.cardinality)),
@@ -34,8 +60,8 @@ export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCan
     [entity],
   );
 
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [relationValues, setRelationValues] = useState<Record<string, unknown>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => initialTextValues(entity, initialRecord));
+  const [relationValues, setRelationValues] = useState<Record<string, unknown>>(() => initialRelationValues(entity, initialRecord));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,10 +71,11 @@ export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCan
     setError(null);
 
     // Las validaciones de "required"/tipo/enum/relación NO se repiten acá a
-    // mano (regla 43): el mismo CommandValidator que corre para Claude en
-    // una fase futura es el que decide si esto se puede mandar o no. Solo
-    // se arma el `data` crudo; si falta algo, el Validator lo va a rechazar
-    // con un diagnóstico legible antes de tocar la red.
+    // mano (regla 27/43 de Fase 13): el mismo CommandValidator que corre
+    // para Claude en una fase futura es el que decide si esto se puede
+    // mandar o no. Solo se arma el `data` crudo; si falta algo, el
+    // Validator lo va a rechazar con un diagnóstico legible antes de tocar
+    // la red.
     const data: Record<string, unknown> = {};
     for (const field of editableFields) {
       const value = coerceValue(values[field.name], field);
@@ -60,19 +87,30 @@ export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCan
 
     setSubmitting(true);
     const repository = new DynamicRepository(baseUrl);
-    const result = await runDynamicCommand({ action: 'CREATE', entity: entity.name, data }, manifest, repository);
+    const command =
+      mode === 'edit'
+        ? { action: 'UPDATE' as const, entity: entity.name, id: idOf(entity, initialRecord!), data }
+        : { action: 'CREATE' as const, entity: entity.name, data };
+    const result = await runDynamicCommand(command, manifest, repository);
     setSubmitting(false);
 
     if (result.status === 'SUCCESS') {
-      onCreated(result.data as DynamicEntity);
+      onSaved(result.data as DynamicEntity);
     } else {
-      setError(result.diagnostics?.[0]?.message ?? result.message ?? 'No se pudo crear el registro.');
+      setError(result.diagnostics?.[0]?.message ?? result.message ?? 'No se pudo guardar.');
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Nuevo/a {entity.label}</Text>
+    // Este componente siempre se monta dentro de un <Modal> (ver
+    // EntityRecordsScreen/DynamicEntityDetailScreen): Modal de React Native
+    // renderiza en una superficie nativa aparte, así que el SafeAreaView de
+    // App.tsx NO aplica acá adentro -- necesita el suyo propio, si no el
+    // título queda tapado por la barra de estado (bug real, encontrado
+    // probando en un emulador real).
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>{mode === 'edit' ? `Editar ${entity.label}` : `Nuevo/a ${entity.label}`}</Text>
 
       {editableFields.map((field) => (
         <FieldInput key={field.name} field={field} value={values[field.name] ?? ''} onChange={(t) => setField(field.name, t)} />
@@ -103,8 +141,15 @@ export function EntityCreateScreen({ baseUrl, manifest, entity, onCreated, onCan
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Guardar</Text>}
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
+}
+
+function idOf(entity: EntityDefinition, record: DynamicEntity): DynamicId {
+  const idFieldName = entity.id?.fields[0]?.name;
+  const value = idFieldName ? record.values[idFieldName] : undefined;
+  return value as DynamicId;
 }
 
 function FieldInput({ field, value, onChange }: { field: FieldDefinition; value: string; onChange: (t: string) => void }) {
@@ -156,6 +201,7 @@ function coerceValue(raw: string | undefined, field: FieldDefinition): unknown {
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { padding: 20, gap: 4, backgroundColor: '#fff' },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 16 },
   fieldGroup: { marginBottom: 16 },

@@ -1,24 +1,26 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, EntityDefinition } from '../domain/manifest';
 import { useEntityRecords } from '../state/useEntityRecords';
-import { EntityCreateScreen } from './EntityCreateScreen';
+import { DynamicEntityFormScreen } from './DynamicEntityFormScreen';
 
 interface Props {
   baseUrl: string;
   manifest: DomainManifest;
   entity: EntityDefinition;
   onBack: () => void;
+  /** El detalle vive un nivel arriba (App.tsx), para que "volver" desde ahí no dependa de esta pantalla seguir montada. */
+  onSelectRecord: (record: DynamicEntity) => void;
 }
 
 /**
- * Lista + alta de UNA entidad (regla 2/45: cero referencias a un dominio
- * puntual -- todo sale de `entity`). "Crear y listar" es el alcance
- * confirmado para este primer corte de Fase 13; editar/borrar/voz quedan
- * para después.
+ * DynamicEntityList (regla 9/10): lista + alta de CUALQUIER entidad
+ * descubierta -- cero referencias a un dominio puntual, todo sale de
+ * `entity`. Cada tarjeta solo muestra `displayField` (regla 10/11): el
+ * detalle completo vive en DynamicEntityDetailScreen, a un toque de acá.
  */
-export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props) {
+export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack, onSelectRecord }: Props) {
   const { state, reload } = useEntityRecords(baseUrl, entity);
   const [showCreate, setShowCreate] = useState(false);
   const canCreate = entity.operations.includes('CREATE');
@@ -34,14 +36,33 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props
       </View>
 
       {state.status === 'loading' && <ActivityIndicator style={styles.spinner} />}
-      {state.status === 'error' && <Text style={styles.error}>{state.message}</Text>}
+      {state.status === 'error' && (
+        <View style={styles.errorBox}>
+          <Text style={styles.error}>No fue posible conectar con el servidor.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={reload}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {state.status === 'loaded' && (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={false} onRefresh={reload} />}>
           {state.records.length === 0 && (
-            <Text style={styles.empty}>Todavía no hay {entity.pluralLabel.toLowerCase()}.</Text>
+            <View>
+              <Text style={styles.empty}>No existen registros.</Text>
+              {canCreate && (
+                <TouchableOpacity style={styles.emptyCreateButton} onPress={() => setShowCreate(true)}>
+                  <Text style={styles.emptyCreateText}>Crear nuevo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
           {state.records.map((record, index) => (
-            <RecordCard key={String(idFieldName ? (record.values[idFieldName] ?? index) : index)} record={record} entity={entity} />
+            <RecordCard
+              key={String(idFieldName ? (record.values[idFieldName] ?? index) : index)}
+              record={record}
+              entity={entity}
+              onPress={() => onSelectRecord(record)}
+            />
           ))}
         </ScrollView>
       )}
@@ -53,11 +74,11 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props
       )}
 
       <Modal visible={showCreate} animationType="slide" onRequestClose={() => setShowCreate(false)}>
-        <EntityCreateScreen
+        <DynamicEntityFormScreen
           baseUrl={baseUrl}
           manifest={manifest}
           entity={entity}
-          onCreated={() => {
+          onSaved={() => {
             setShowCreate(false);
             reload();
           }}
@@ -68,26 +89,13 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack }: Props
   );
 }
 
-function RecordCard({ record, entity }: { record: DynamicEntity; entity: EntityDefinition }) {
+function RecordCard({ record, entity, onPress }: { record: DynamicEntity; entity: EntityDefinition; onPress: () => void }) {
   const title = String(record.values[entity.displayField] ?? '(sin nombre)');
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <Text style={styles.cardTitle}>{title}</Text>
-      {entity.fields
-        .filter((field) => field.name !== entity.displayField)
-        .map((field) => (
-          <Text key={field.name} style={styles.cardLine}>
-            {field.label}: {formatValue(record.values[field.name])}
-          </Text>
-        ))}
-    </View>
+    </TouchableOpacity>
   );
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  return String(value);
 }
 
 const styles = StyleSheet.create({
@@ -96,12 +104,16 @@ const styles = StyleSheet.create({
   back: { color: '#2563eb', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 24, fontWeight: '700' },
   spinner: { marginTop: 24 },
-  error: { color: '#dc2626', paddingHorizontal: 20 },
+  errorBox: { padding: 20, gap: 12 },
+  error: { color: '#dc2626' },
+  retryButton: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#dc2626', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { color: '#dc2626', fontWeight: '600' },
   list: { padding: 20, paddingTop: 8, gap: 8 },
-  empty: { color: '#888', fontSize: 14 },
+  empty: { color: '#888', fontSize: 14, marginBottom: 12 },
+  emptyCreateButton: { alignSelf: 'flex-start', backgroundColor: '#2563eb', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18 },
+  emptyCreateText: { color: '#fff', fontWeight: '600' },
   card: { borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10, padding: 14, marginBottom: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  cardLine: { fontSize: 13, color: '#555' },
+  cardTitle: { fontSize: 16, fontWeight: '600' },
   fab: { position: 'absolute', right: 20, bottom: 24, backgroundColor: '#2563eb', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 22 },
   fabText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

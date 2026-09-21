@@ -5,19 +5,26 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectScreen } from './src/screens/ConnectScreen';
 import { DiscoveryScreen } from './src/screens/DiscoveryScreen';
 import { EntityRecordsScreen } from './src/screens/EntityRecordsScreen';
+import { DynamicEntityDetailScreen } from './src/screens/DynamicEntityDetailScreen';
 import { CommandConsoleScreen } from './src/screens/CommandConsoleScreen';
 import { useBackendConnection } from './src/state/useBackendConnection';
 import type { EntityDefinition } from './src/domain/manifest';
+import type { DynamicEntity } from './src/engine/dynamicEntity';
 
-type ConnectedView = { kind: 'discovery' } | { kind: 'records'; entity: EntityDefinition } | { kind: 'console' };
+type ConnectedView =
+  | { kind: 'discovery' }
+  | { kind: 'records'; entity: EntityDefinition }
+  | { kind: 'detail'; entity: EntityDefinition; record: DynamicEntity }
+  | { kind: 'console' };
 
 /**
- * Mismo build, cualquier backend generado por ShareGrams (regla 2/45): acá
- * no hay ni una sola referencia a "Cliente", "Paciente" ni ningún dominio
- * puntual -- solo `state.status`, el `manifest` que trajo ESE backend en
- * particular, y (Fase 13) qué pantalla conectada está mirando el usuario.
- * `view` se resetea solo al desconectar porque deja de ser un dato válido:
- * no hay "pantalla conectada" sin conexión.
+ * Mismo build, cualquier backend generado por ShareGrams (regla 2/45/73):
+ * acá no hay ni una sola referencia a "Cliente", "Paciente" ni ningún
+ * dominio puntual -- solo `state.status`, el `manifest` que trajo ESE
+ * backend en particular, y qué pantalla conectada está mirando el usuario.
+ * `view` se resetea solo al desconectar (regla 53/54): deja de ser un dato
+ * válido, no hay "pantalla conectada" sin conexión, y evita mezclar el
+ * estado de navegación de un dominio con el de otro al cambiar de backend.
  */
 export default function App() {
   const { state, connect, disconnect } = useBackendConnection();
@@ -31,8 +38,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.root}>
-        {state.status === 'connected' && view.kind === 'records' ? (
-          <EntityRecordsScreen baseUrl={state.url} manifest={state.manifest} entity={view.entity} onBack={() => setView({ kind: 'discovery' })} />
+        {state.status === 'connected' && view.kind === 'detail' ? (
+          <DynamicEntityDetailScreen
+            baseUrl={state.url}
+            manifest={state.manifest}
+            entity={view.entity}
+            record={view.record}
+            onBack={() => setView({ kind: 'records', entity: view.entity })}
+          />
+        ) : state.status === 'connected' && view.kind === 'records' ? (
+          <EntityRecordsScreen
+            baseUrl={state.url}
+            manifest={state.manifest}
+            entity={view.entity}
+            onBack={() => setView({ kind: 'discovery' })}
+            onSelectRecord={(record) => setView({ kind: 'detail', entity: view.entity, record })}
+          />
         ) : state.status === 'connected' && view.kind === 'console' ? (
           <CommandConsoleScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
         ) : state.status === 'connected' ? (
