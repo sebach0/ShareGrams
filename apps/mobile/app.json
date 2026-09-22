@@ -22,6 +22,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "ShareGrams necesita el micrófono para el dictado por voz del Asistente (IA).",
+          "speechRecognitionPermission": "ShareGrams necesita reconocimiento de voz para el dictado por voz del Asistente (IA)."
+        }
+      ]
+    ]
   }
 }
