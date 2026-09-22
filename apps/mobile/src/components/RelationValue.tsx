@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { DynamicRepository } from '../engine/dynamicRepository';
 import type { DomainManifest, RelationDefinition } from '../domain/manifest';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 interface Props {
-  baseUrl: string;
+  dataSource: DynamicDataSource;
   manifest: DomainManifest;
   relation: RelationDefinition;
   value: unknown;
@@ -21,7 +21,7 @@ type State = { status: 'loading' } | { status: 'loaded'; label: string } | { sta
  * muestra la cantidad, mismo criterio de "no sobreingenierizar" que ya
  * aplicó el formulario (regla 36: M:N queda de solo lectura/documentado).
  */
-export function RelationValue({ baseUrl, manifest, relation, value }: Props) {
+export function RelationValue({ dataSource, manifest, relation, value }: Props) {
   const targetEntity = manifest.entities.find((e) => e.name === relation.targetEntity);
   const isToMany = relation.cardinality === 'MANY_TO_MANY';
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -31,8 +31,7 @@ export function RelationValue({ baseUrl, manifest, relation, value }: Props) {
     let cancelled = false;
     setState({ status: 'loading' });
 
-    const repository = new DynamicRepository(baseUrl);
-    repository.get(targetEntity, value as string | number).then((result) => {
+    dataSource.get(targetEntity, value as string | number).then((result) => {
       if (cancelled) return;
       if (result.kind === 'ok') {
         setState({ status: 'loaded', label: String(result.value.values[targetEntity.displayField] ?? value) });
@@ -44,7 +43,7 @@ export function RelationValue({ baseUrl, manifest, relation, value }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, targetEntity, value, isToMany]);
+  }, [dataSource, targetEntity, value, isToMany]);
 
   if (isToMany) {
     const count = Array.isArray(value) ? value.length : 0;

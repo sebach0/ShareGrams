@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
-import { DynamicRepository } from '../engine/dynamicRepository';
 import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DynamicId } from '../engine/dynamicCommand';
 import type { DomainManifest, EntityDefinition, FieldDefinition } from '../domain/manifest';
 import { RelationPicker } from '../components/RelationPicker';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 interface Props {
-  baseUrl: string;
+  dataSource: DynamicDataSource;
   manifest: DomainManifest;
   entity: EntityDefinition;
   /** Ausente = CREATE; presente = EDIT, precarga el formulario con sus valores (regla 15-17: mismo componente, no dos formularios separados). */
@@ -47,7 +47,7 @@ function initialRelationValues(entity: EntityDefinition, record: DynamicEntity |
   return values;
 }
 
-export function DynamicEntityFormScreen({ baseUrl, manifest, entity, initialRecord, onSaved, onCancel }: Props) {
+export function DynamicEntityFormScreen({ dataSource, manifest, entity, initialRecord, onSaved, onCancel }: Props) {
   const mode: 'create' | 'edit' = initialRecord ? 'edit' : 'create';
 
   const editableFields = useMemo(() => entity.fields.filter((f) => f.editable && !f.generated), [entity]);
@@ -86,12 +86,11 @@ export function DynamicEntityFormScreen({ baseUrl, manifest, entity, initialReco
     }
 
     setSubmitting(true);
-    const repository = new DynamicRepository(baseUrl);
     const command =
       mode === 'edit'
         ? { action: 'UPDATE' as const, entity: entity.name, id: idOf(entity, initialRecord!), data }
         : { action: 'CREATE' as const, entity: entity.name, data };
-    const result = await runDynamicCommand(command, manifest, repository);
+    const result = await runDynamicCommand(command, manifest, dataSource);
     setSubmitting(false);
 
     if (result.status === 'SUCCESS') {
@@ -119,7 +118,7 @@ export function DynamicEntityFormScreen({ baseUrl, manifest, entity, initialReco
       {editableRelations.map((relation) => (
         <RelationPicker
           key={relation.name}
-          baseUrl={baseUrl}
+          dataSource={dataSource}
           manifest={manifest}
           relation={relation}
           selectedId={relationValues[relation.name]}

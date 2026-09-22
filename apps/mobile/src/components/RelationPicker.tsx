@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { DynamicRepository, repositoryErrorMessage } from '../engine/dynamicRepository';
+import { repositoryErrorMessage } from '../engine/dynamicRepository';
 import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, RelationDefinition } from '../domain/manifest';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 interface Props {
-  baseUrl: string;
+  dataSource: DynamicDataSource;
   manifest: DomainManifest;
   relation: RelationDefinition;
   selectedId: unknown;
@@ -21,7 +22,7 @@ type PickerState = { status: 'loading' } | { status: 'loaded'; records: DynamicE
  * deja elegir un registro por su `displayField` -- nunca pide al usuario que
  * escriba un id a mano.
  */
-export function RelationPicker({ baseUrl, manifest, relation, selectedId, onSelect }: Props) {
+export function RelationPicker({ dataSource, manifest, relation, selectedId, onSelect }: Props) {
   const targetEntity = manifest.entities.find((e) => e.name === relation.targetEntity);
   const [state, setState] = useState<PickerState>({ status: 'loading' });
 
@@ -30,8 +31,7 @@ export function RelationPicker({ baseUrl, manifest, relation, selectedId, onSele
     let cancelled = false;
     setState({ status: 'loading' });
 
-    const repository = new DynamicRepository(baseUrl);
-    repository.list(targetEntity).then((result) => {
+    dataSource.list(targetEntity).then((result) => {
       if (cancelled) return;
       setState(result.kind === 'ok' ? { status: 'loaded', records: result.value } : { status: 'error', message: repositoryErrorMessage(result) });
     });
@@ -39,7 +39,7 @@ export function RelationPicker({ baseUrl, manifest, relation, selectedId, onSele
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, targetEntity]);
+  }, [dataSource, targetEntity]);
 
   if (!targetEntity || !targetEntity.id) {
     return (

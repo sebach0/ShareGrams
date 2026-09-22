@@ -1,16 +1,20 @@
 import type { DomainManifest } from '../domain/manifest';
 import type { CommandResult } from './commandResult';
 import type { DynamicCommand } from './dynamicCommand';
-import type { DynamicRepository, RepositoryResult } from './dynamicRepository';
+import type { RepositoryResult } from './dynamicRepository';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 /**
  * Traduce un DynamicCommand YA VALIDADO a un CommandResult uniforme,
- * seleccionando la operación correspondiente del DynamicRepository (regla
- * 42). NO repite la validación semántica de CommandValidator (regla 43) --
- * confía en que quien lo llama corrió el Validator antes (ver
- * runDynamicCommand.ts, el único punto que encadena los dos).
+ * seleccionando la operación correspondiente sobre el `DynamicDataSource`
+ * recibido (regla 42) -- desde Fase 17 puede ser tanto `DynamicRepository`
+ * (HTTP) como `OfflineFirstDataSource` (local-first): esta función nunca
+ * se entera de cuál de las dos es. NO repite la validación semántica de
+ * CommandValidator (regla 43) -- confía en que quien lo llama corrió el
+ * Validator antes (ver runDynamicCommand.ts, el único punto que encadena
+ * los dos).
  */
-export async function executeCommand(command: DynamicCommand, manifest: DomainManifest, repository: DynamicRepository): Promise<CommandResult> {
+export async function executeCommand(command: DynamicCommand, manifest: DomainManifest, repository: DynamicDataSource): Promise<CommandResult> {
   const entity = manifest.entities.find((e) => e.name === command.entity);
   if (!entity) {
     // Defensa mínima (regla 43), no una revalidación completa: si esto se

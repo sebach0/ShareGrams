@@ -4,9 +4,11 @@ import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DomainManifest, EntityDefinition } from '../domain/manifest';
 import { useEntityRecords } from '../state/useEntityRecords';
 import { DynamicEntityFormScreen } from './DynamicEntityFormScreen';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
+import { isLocalId } from '../offline/localId';
 
 interface Props {
-  baseUrl: string;
+  dataSource: DynamicDataSource;
   manifest: DomainManifest;
   entity: EntityDefinition;
   onBack: () => void;
@@ -20,8 +22,8 @@ interface Props {
  * `entity`. Cada tarjeta solo muestra `displayField` (regla 10/11): el
  * detalle completo vive en DynamicEntityDetailScreen, a un toque de acá.
  */
-export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack, onSelectRecord }: Props) {
-  const { state, reload } = useEntityRecords(baseUrl, entity);
+export function EntityRecordsScreen({ dataSource, manifest, entity, onBack, onSelectRecord }: Props) {
+  const { state, reload } = useEntityRecords(dataSource, entity);
   const [showCreate, setShowCreate] = useState(false);
   const canCreate = entity.operations.includes('CREATE');
   const idFieldName = entity.id?.fields[0]?.name;
@@ -75,7 +77,7 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack, onSelec
 
       <Modal visible={showCreate} animationType="slide" onRequestClose={() => setShowCreate(false)}>
         <DynamicEntityFormScreen
-          baseUrl={baseUrl}
+          dataSource={dataSource}
           manifest={manifest}
           entity={entity}
           onSaved={() => {
@@ -91,9 +93,12 @@ export function EntityRecordsScreen({ baseUrl, manifest, entity, onBack, onSelec
 
 function RecordCard({ record, entity, onPress }: { record: DynamicEntity; entity: EntityDefinition; onPress: () => void }) {
   const title = String(record.values[entity.displayField] ?? '(sin nombre)');
+  const idField = entity.id?.fields[0]?.name;
+  const pendingSync = idField ? isLocalId(record.values[idField]) : false;
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <Text style={styles.cardTitle}>{title}</Text>
+      {pendingSync && <Text style={styles.pendingBadge}>☁ Pendiente de sincronizar</Text>}
     </TouchableOpacity>
   );
 }
@@ -114,6 +119,7 @@ const styles = StyleSheet.create({
   emptyCreateText: { color: '#fff', fontWeight: '600' },
   card: { borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10, padding: 14, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
+  pendingBadge: { fontSize: 12, color: '#b45309', marginTop: 4 },
   fab: { position: 'absolute', right: 20, bottom: 24, backgroundColor: '#2563eb', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 22 },
   fabText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

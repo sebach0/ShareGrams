@@ -2,6 +2,7 @@ import type { EntityDefinition } from '../domain/manifest';
 import { request, type HttpOutcome } from '../api/dynamicApiClient';
 import { toDynamicEntity, type DynamicEntity } from './dynamicEntity';
 import type { DynamicData, DynamicId } from './dynamicCommand';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 export type RepositoryResult<T> =
   | { kind: 'ok'; value: T }
@@ -61,7 +62,7 @@ export function repositoryErrorMessage(result: Exclude<RepositoryResult<unknown>
  * documentado (regla 40/41), no una solución escalable -- no usar con
  * datasets grandes.
  */
-export class DynamicRepository {
+export class DynamicRepository implements DynamicDataSource {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,

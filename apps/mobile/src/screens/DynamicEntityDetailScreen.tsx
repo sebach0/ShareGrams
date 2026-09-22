@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
-import { DynamicRepository } from '../engine/dynamicRepository';
 import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { DynamicId } from '../engine/dynamicCommand';
 import type { DomainManifest, EntityDefinition } from '../domain/manifest';
 import { formatFieldValue } from '../domain/fieldDisplay';
 import { RelationValue } from '../components/RelationValue';
 import { DynamicEntityFormScreen } from './DynamicEntityFormScreen';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
+import { isLocalId } from '../offline/localId';
 
 interface Props {
-  baseUrl: string;
+  dataSource: DynamicDataSource;
   manifest: DomainManifest;
   entity: EntityDefinition;
   record: DynamicEntity;
@@ -24,7 +25,7 @@ interface Props {
  * por dominio. "Editar"/"Eliminar" solo aparecen si el Manifest declara esa
  * operación para esta entidad (regla 40/42/43).
  */
-export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, onBack }: Props) {
+export function DynamicEntityDetailScreen({ dataSource, manifest, entity, record, onBack }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,8 @@ export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, o
   const canUpdate = entity.operations.includes('UPDATE');
   const canDelete = entity.operations.includes('DELETE');
   const title = String(record.values[entity.displayField] ?? entity.label);
+  const idFieldName = entity.id?.fields[0]?.name;
+  const pendingSync = idFieldName ? isLocalId(record.values[idFieldName]) : false;
 
   const handleDelete = () => {
     const id = idOf(entity, record);
@@ -44,8 +47,7 @@ export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, o
         onPress: async () => {
           setError(null);
           setDeleting(true);
-          const repository = new DynamicRepository(baseUrl);
-          const result = await runDynamicCommand({ action: 'DELETE', entity: entity.name, id }, manifest, repository);
+          const result = await runDynamicCommand({ action: 'DELETE', entity: entity.name, id }, manifest, dataSource);
           setDeleting(false);
           if (result.status === 'SUCCESS') {
             onBack();
@@ -64,6 +66,7 @@ export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, o
           <Text style={styles.back}>← {entity.pluralLabel}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{title}</Text>
+        {pendingSync && <Text style={styles.pendingBadge}>☁ Pendiente de sincronizar</Text>}
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
@@ -77,7 +80,7 @@ export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, o
         {entity.relations.map((relation) => (
           <View key={relation.name} style={styles.row}>
             <Text style={styles.label}>{relation.name}</Text>
-            <RelationValue baseUrl={baseUrl} manifest={manifest} relation={relation} value={record.values[relation.name]} />
+            <RelationValue dataSource={dataSource} manifest={manifest} relation={relation} value={record.values[relation.name]} />
           </View>
         ))}
 
@@ -99,7 +102,7 @@ export function DynamicEntityDetailScreen({ baseUrl, manifest, entity, record, o
 
       <Modal visible={showEdit} animationType="slide" onRequestClose={() => setShowEdit(false)}>
         <DynamicEntityFormScreen
-          baseUrl={baseUrl}
+          dataSource={dataSource}
           manifest={manifest}
           entity={entity}
           initialRecord={record}
@@ -124,6 +127,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingBottom: 8 },
   back: { color: '#2563eb', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 24, fontWeight: '700' },
+  pendingBadge: { fontSize: 13, color: '#b45309', marginTop: 4 },
   body: { padding: 20, paddingTop: 8, gap: 4 },
   row: { marginBottom: 14 },
   label: { fontSize: 12, color: '#888', marginBottom: 2 },

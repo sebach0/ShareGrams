@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DynamicRepository, repositoryErrorMessage } from '../engine/dynamicRepository';
+import { repositoryErrorMessage } from '../engine/dynamicRepository';
 import type { DynamicEntity } from '../engine/dynamicEntity';
 import type { EntityDefinition } from '../domain/manifest';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 export type RecordsState =
   | { status: 'loading' }
@@ -15,13 +16,16 @@ export interface UseEntityRecords {
 
 /**
  * Carga la lista de UNA entidad descubierta a través del motor de Fase 13
- * (DynamicRepository), no de un fetch propio -- misma regla 31 ("no HTTP en
- * widgets") aplicada también a los hooks. `entity` cambia cuando el usuario
- * navega a otra entidad del mismo manifest -- el efecto vuelve a correr
- * solo (mismo patrón `cancelled` que EditorPage.tsx en apps/web, para que
- * una respuesta vieja nunca pise el estado de una carga más nueva).
+ * (`DynamicDataSource`, no de un fetch propio -- misma regla 31 ("no HTTP en
+ * widgets") aplicada también a los hooks. Desde Fase 17, `dataSource` es
+ * el `OfflineFirstDataSource` (local-first) armado en `App.tsx`, no un
+ * `DynamicRepository` construido acá -- este hook no sabe ni le importa
+ * si atrás hay HTTP o SQLite. `entity` cambia cuando el usuario navega a
+ * otra entidad del mismo manifest -- el efecto vuelve a correr solo
+ * (mismo patrón `cancelled` que EditorPage.tsx en apps/web, para que una
+ * respuesta vieja nunca pise el estado de una carga más nueva).
  */
-export function useEntityRecords(baseUrl: string, entity: EntityDefinition): UseEntityRecords {
+export function useEntityRecords(dataSource: DynamicDataSource, entity: EntityDefinition): UseEntityRecords {
   const [state, setState] = useState<RecordsState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -29,8 +33,7 @@ export function useEntityRecords(baseUrl: string, entity: EntityDefinition): Use
     let cancelled = false;
     setState({ status: 'loading' });
 
-    const repository = new DynamicRepository(baseUrl);
-    repository.list(entity).then((result) => {
+    dataSource.list(entity).then((result) => {
       if (cancelled) return;
       if (result.kind === 'ok') {
         setState({ status: 'loaded', records: result.value });
@@ -42,7 +45,7 @@ export function useEntityRecords(baseUrl: string, entity: EntityDefinition): Use
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, entity, reloadToken]);
+  }, [dataSource, entity, reloadToken]);
 
   const reload = useCallback(() => setReloadToken((t) => t + 1), []);
 

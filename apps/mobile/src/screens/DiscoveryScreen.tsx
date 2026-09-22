@@ -1,5 +1,13 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { DomainManifest, EntityDefinition } from '../domain/manifest';
+import type { SyncSummary } from '../offline/syncEngine';
+
+interface OfflineStatus {
+  online: boolean;
+  syncing: boolean;
+  lastSummary: SyncSummary | null;
+  onSyncNow: () => void;
+}
 
 interface Props {
   url: string;
@@ -8,6 +16,7 @@ interface Props {
   onSelectEntity: (entity: EntityDefinition) => void;
   onOpenConsole: () => void;
   onOpenAssistant: () => void;
+  offline: OfflineStatus;
 }
 
 /**
@@ -17,11 +26,13 @@ interface Props {
  * -- lo único que cambia es el `manifest` que reciben. Tocar una tarjeta
  * navega a EntityRecordsScreen (lista + alta) para esa entidad.
  */
-export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, onOpenConsole, onOpenAssistant }: Props) {
+export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, onOpenConsole, onOpenAssistant, offline }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.appName}>{manifest.application.name}</Text>
       <Text style={styles.url}>{url}</Text>
+
+      <SyncStatusBar offline={offline} />
 
       <Text style={styles.sectionTitle}>Entidades detectadas ({manifest.entities.length})</Text>
       {manifest.entities.map((entity) => (
@@ -41,6 +52,41 @@ export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, o
       </TouchableOpacity>
     </ScrollView>
   );
+}
+
+/**
+ * Estado de sincronización (Fase 17, regla 13/27): ☁ offline, ⏳
+ * sincronizando, ✅ todo al día -- con un botón manual para no depender
+ * solo de la detección automática de reconexión.
+ */
+function SyncStatusBar({ offline }: { offline: OfflineStatus }) {
+  return (
+    <View style={styles.syncBar}>
+      <Text style={styles.syncText}>
+        {!offline.online
+          ? '☁ Sin conexión -- los cambios se guardan localmente'
+          : offline.syncing
+            ? '⏳ Sincronizando...'
+            : offline.lastSummary
+              ? summaryText(offline.lastSummary)
+              : '✅ Conectado'}
+      </Text>
+      {offline.online && (
+        <TouchableOpacity style={styles.syncButton} onPress={offline.onSyncNow} disabled={offline.syncing}>
+          {offline.syncing ? <ActivityIndicator size="small" color="#2563eb" /> : <Text style={styles.syncButtonText}>Sincronizar ahora</Text>}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function summaryText(summary: SyncSummary): string {
+  if (summary.synced === 0 && summary.conflicts === 0 && summary.failed === 0) return '✅ Todo sincronizado';
+  const parts: string[] = [];
+  if (summary.synced > 0) parts.push(`${summary.synced} sincronizado${summary.synced === 1 ? '' : 's'}`);
+  if (summary.conflicts > 0) parts.push(`${summary.conflicts} en conflicto`);
+  if (summary.failed > 0) parts.push(`${summary.failed} con error`);
+  return `✅ ${parts.join(', ')}`;
 }
 
 function EntityCard({ entity, onPress }: { entity: EntityDefinition; onPress: () => void }) {
@@ -76,6 +122,10 @@ const styles = StyleSheet.create({
   appName: { fontSize: 24, fontWeight: '700' },
   url: { fontSize: 13, color: '#666', marginBottom: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  syncBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f3f4f6', borderRadius: 8, padding: 10, marginBottom: 16 },
+  syncText: { fontSize: 13, color: '#333', flexShrink: 1 },
+  syncButton: { paddingVertical: 6, paddingHorizontal: 10 },
+  syncButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
   card: { borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10, padding: 14, marginBottom: 12 },
   entityName: { fontSize: 18, fontWeight: '700' },
   entityMeta: { fontSize: 12, color: '#888', marginBottom: 8 },
