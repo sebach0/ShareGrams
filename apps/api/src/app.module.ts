@@ -9,6 +9,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { DiagramsModule } from './diagrams/diagrams.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ImageImportModule } from './image-import/image-import.module';
+import { DynamicAssistantModule } from './dynamic-assistant/dynamic-assistant.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ImageImportModule } from './image-import/image-import.module';
     DiagramsModule,
     RealtimeModule,
     ImageImportModule,
+    DynamicAssistantModule,
   ],
 })
 export class AppModule {}

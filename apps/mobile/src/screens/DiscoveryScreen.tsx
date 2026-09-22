@@ -7,6 +7,7 @@ interface Props {
   onDisconnect: () => void;
   onSelectEntity: (entity: EntityDefinition) => void;
   onOpenConsole: () => void;
+  onOpenAssistant: () => void;
 }
 
 /**
@@ -16,7 +17,7 @@ interface Props {
  * -- lo único que cambia es el `manifest` que reciben. Tocar una tarjeta
  * navega a EntityRecordsScreen (lista + alta) para esa entidad.
  */
-export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, onOpenConsole }: Props) {
+export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, onOpenConsole, onOpenAssistant }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.appName}>{manifest.application.name}</Text>
@@ -26,6 +27,10 @@ export function DiscoveryScreen({ url, manifest, onDisconnect, onSelectEntity, o
       {manifest.entities.map((entity) => (
         <EntityCard key={entity.name} entity={entity} onPress={() => onSelectEntity(entity)} />
       ))}
+
+      <TouchableOpacity style={styles.assistantButton} onPress={onOpenAssistant}>
+        <Text style={styles.assistantText}>🤖 Asistente (IA)</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.consoleButton} onPress={onOpenConsole}>
         <Text style={styles.consoleText}>🧪 Consola de comandos (dev)</Text>
@@ -76,6 +81,8 @@ const styles = StyleSheet.create({
   entityMeta: { fontSize: 12, color: '#888', marginBottom: 8 },
   line: { fontSize: 14, color: '#333' },
   relationLine: { fontSize: 14, color: '#2563eb' },
+  assistantButton: { marginTop: 12, padding: 14, borderRadius: 8, backgroundColor: '#2563eb', alignItems: 'center' },
+  assistantText: { color: '#fff', fontWeight: '700' },
   consoleButton: { marginTop: 12, padding: 14, borderRadius: 8, borderWidth: 1, borderColor: '#ccc', alignItems: 'center' },
   consoleText: { color: '#333', fontWeight: '600' },
   disconnectButton: { marginTop: 12, padding: 14, borderRadius: 8, borderWidth: 1, borderColor: '#dc2626', alignItems: 'center' },

@@ -7,6 +7,7 @@ import { DiscoveryScreen } from './src/screens/DiscoveryScreen';
 import { EntityRecordsScreen } from './src/screens/EntityRecordsScreen';
 import { DynamicEntityDetailScreen } from './src/screens/DynamicEntityDetailScreen';
 import { CommandConsoleScreen } from './src/screens/CommandConsoleScreen';
+import { AIChatScreen } from './src/screens/AIChatScreen';
 import { useBackendConnection } from './src/state/useBackendConnection';
 import type { EntityDefinition } from './src/domain/manifest';
 import type { DynamicEntity } from './src/engine/dynamicEntity';
@@ -15,7 +16,8 @@ type ConnectedView =
   | { kind: 'discovery' }
   | { kind: 'records'; entity: EntityDefinition }
   | { kind: 'detail'; entity: EntityDefinition; record: DynamicEntity }
-  | { kind: 'console' };
+  | { kind: 'console' }
+  | { kind: 'assistant' };
 
 /**
  * Mismo build, cualquier backend generado por ShareGrams (regla 2/45/73):
@@ -56,6 +58,8 @@ export default function App() {
           />
         ) : state.status === 'connected' && view.kind === 'console' ? (
           <CommandConsoleScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
+        ) : state.status === 'connected' && view.kind === 'assistant' ? (
+          <AIChatScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
         ) : state.status === 'connected' ? (
           <DiscoveryScreen
             url={state.url}
@@ -63,6 +67,7 @@ export default function App() {
             onDisconnect={handleDisconnect}
             onSelectEntity={(entity) => setView({ kind: 'records', entity })}
             onOpenConsole={() => setView({ kind: 'console' })}
+            onOpenAssistant={() => setView({ kind: 'assistant' })}
           />
         ) : (
           <ConnectScreen state={state} onConnect={connect} />
