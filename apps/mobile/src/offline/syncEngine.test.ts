@@ -42,14 +42,19 @@ class FakeRemote implements DynamicDataSource {
   update = vi.fn(async (_entity: EntityDefinition, id: DynamicId, data: DynamicData): Promise<RepositoryResult<DynamicEntity>> => ({ kind: 'ok', value: { entityType: _entity.name, values: { ...data, id } } }));
   get = vi.fn(async (_entity: EntityDefinition, id: DynamicId): Promise<RepositoryResult<DynamicEntity>> => ({ kind: 'ok', value: { entityType: _entity.name, values: { id, nombre: 'Carlos' } } }));
   delete = vi.fn(async (): Promise<RepositoryResult<void>> => ({ kind: 'ok', value: undefined }));
-  list = vi.fn(async (): Promise<RepositoryResult<DynamicEntity[]>> => ({ kind: 'ok', value: [] }));
+  list = vi.fn(async (_entity: EntityDefinition): Promise<RepositoryResult<DynamicEntity[]>> => ({ kind: 'ok', value: [] }));
   search = vi.fn(async (): Promise<RepositoryResult<DynamicEntity[]>> => ({ kind: 'ok', value: [] }));
   count = vi.fn(async (): Promise<RepositoryResult<number>> => ({ kind: 'ok', value: 0 }));
 }
 
+function fakeIdGenerator(): () => string {
+  let counter = 0;
+  return () => `local:test-${++counter}`;
+}
+
 function setup() {
-  const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>());
-  const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>());
+  const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>(), fakeIdGenerator());
+  const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>(), fakeIdGenerator());
   const remote = new FakeRemote();
   const engine = new SyncEngine(queue, local, remote, manifest);
   return { local, queue, remote, engine };
@@ -203,6 +208,49 @@ describe('SyncEngine.processQueue -- DELETE', () => {
   });
 });
 
+describe('SyncEngine.hydrate', () => {
+  it('trae los registros que ya existían en el servidor y los agrega local como SYNCED', async () => {
+    const { local, remote, engine } = setup();
+    remote.list.mockImplementation(async (entity: EntityDefinition) => {
+      if (entity.name !== 'Universidad') return { kind: 'ok', value: [] };
+      return { kind: 'ok', value: [{ entityType: 'Universidad', values: { id: 7, nombre: 'UMSA' } }] };
+    });
+
+    await engine.hydrate();
+
+    const list = await local.list(universidad);
+    expect(list.kind).toBe('ok');
+    if (list.kind !== 'ok') return;
+    expect(list.value).toEqual([{ entityType: 'Universidad', values: { id: 7, nombre: 'UMSA' } }]);
+  });
+
+  it('no duplica un registro que ya existe local (por remoteId)', async () => {
+    const { local, remote, engine } = setup();
+    const created = await local.create(universidad, { nombre: 'UMSA' });
+    if (created.kind !== 'ok') throw new Error('esperaba ok');
+    await local.markSynced(created.value.values.id as string, 7, { id: 7, nombre: 'UMSA' });
+
+    remote.list.mockImplementation(async (entity: EntityDefinition) => {
+      if (entity.name !== 'Universidad') return { kind: 'ok', value: [] };
+      return { kind: 'ok', value: [{ entityType: 'Universidad', values: { id: 7, nombre: 'UMSA' } }] };
+    });
+
+    await engine.hydrate();
+
+    const list = await local.list(universidad);
+    if (list.kind !== 'ok') throw new Error('esperaba ok');
+    expect(list.value).toHaveLength(1);
+  });
+
+  it('no rompe nada si el remoto falla (sin conexión) -- sigue con lo que ya había local', async () => {
+    const { local, remote, engine } = setup();
+    remote.list.mockResolvedValue({ kind: 'network_error', message: 'sin conexión' });
+
+    await expect(engine.hydrate()).resolves.toBeUndefined();
+    expect(await local.list(universidad)).toEqual({ kind: 'ok', value: [] });
+  });
+});
+
 describe('SyncEngine -- multi-dominio (misma lógica, sin nada hardcodeado por entidad)', () => {
   it('funciona igual con un Manifest de otro dominio (Ventas: Cliente/Producto)', async () => {
     const cliente: EntityDefinition = {
@@ -218,8 +266,8 @@ describe('SyncEngine -- multi-dominio (misma lógica, sin nada hardcodeado por e
     };
     const ventasManifest: DomainManifest = { version: '1.0', application: { name: 'Ventas' }, entities: [cliente] };
 
-    const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>());
-    const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>());
+    const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>(), fakeIdGenerator());
+    const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>(), fakeIdGenerator());
     const remote = new FakeRemote();
     const engine = new SyncEngine(queue, local, remote, ventasManifest);
 

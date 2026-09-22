@@ -5,7 +5,7 @@ import type { RepositoryResult } from '../engine/dynamicRepository';
 import type { DynamicDataSource } from './dynamicDataSource';
 import type { KeyValueRecordStore } from './recordStore';
 import type { LocalDynamicEntity, SyncStatus } from './localDynamicEntity';
-import { generateLocalId, isLocalId } from './localId';
+import { isLocalId } from './localId';
 
 function idFieldName(entity: EntityDefinition): string {
   return entity.id?.fields[0]?.name ?? 'id';
@@ -30,7 +30,11 @@ function toDynamicEntityView(entity: EntityDefinition, record: LocalDynamicEntit
  * de entidad): el campo id se resuelve siempre vía `EntityDefinition.id`.
  */
 export class LocalDataSource implements DynamicDataSource {
-  constructor(private readonly store: KeyValueRecordStore<LocalDynamicEntity>) {}
+  constructor(
+    private readonly store: KeyValueRecordStore<LocalDynamicEntity>,
+    /** Inyectado (no importa `expo-crypto` acá) -- ver `idGenerator.ts` para el motivo. */
+    private readonly generateId: () => string,
+  ) {}
 
   async list(entity: EntityDefinition): Promise<RepositoryResult<DynamicEntity[]>> {
     const records = await this.recordsFor(entity.name);
@@ -44,7 +48,7 @@ export class LocalDataSource implements DynamicDataSource {
   }
 
   async create(entity: EntityDefinition, data: DynamicData): Promise<RepositoryResult<DynamicEntity>> {
-    const localId = generateLocalId();
+    const localId = this.generateId();
     const record: LocalDynamicEntity = {
       id: localId,
       localId,
@@ -112,6 +116,29 @@ export class LocalDataSource implements DynamicDataSource {
   async allPendingByEntity(entityType: string): Promise<LocalDynamicEntity[]> {
     const records = await this.recordsFor(entityType, true);
     return records.filter((r) => r.syncStatus === 'PENDING_SYNC');
+  }
+
+  /** ¿Ya existe una copia local de este id remoto? -- lo usa la hidratación inicial (`SyncEngine.hydrate`) para no duplicar. */
+  async hasRemoteId(entityType: string, remoteId: DynamicId): Promise<boolean> {
+    const records = await this.recordsFor(entityType, true);
+    return records.some((r) => r.remoteId === remoteId);
+  }
+
+  /** Inserta un registro que YA existía en el servidor (hidratación, nunca creado offline) -- nace directo en SYNCED, nunca pasa por la cola. */
+  async insertFromRemote(entity: EntityDefinition, remoteId: DynamicId, values: Record<string, unknown>): Promise<void> {
+    const localId = this.generateId();
+    const record: LocalDynamicEntity = {
+      id: localId,
+      localId,
+      remoteId,
+      entityType: entity.name,
+      values,
+      lastKnownRemoteValues: values,
+      syncStatus: 'SYNCED',
+      deleted: false,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.store.put(record);
   }
 
   async markSynced(localId: string, remoteId: DynamicId, remoteValues: Record<string, unknown>): Promise<void> {

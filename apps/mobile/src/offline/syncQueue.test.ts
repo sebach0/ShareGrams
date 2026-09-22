@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { SyncQueue, type SyncQueueItem } from './syncQueue';
 import { InMemoryRecordStore } from './recordStore';
 
+function fakeIdGenerator(): () => string {
+  let counter = 0;
+  return () => `id-${++counter}`;
+}
+
 function newQueue() {
-  return new SyncQueue(new InMemoryRecordStore<SyncQueueItem>());
+  return new SyncQueue(new InMemoryRecordStore<SyncQueueItem>(), fakeIdGenerator());
 }
 
 describe('SyncQueue.enqueue', () => {

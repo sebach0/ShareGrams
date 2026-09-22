@@ -18,9 +18,14 @@ const universidad: EntityDefinition = {
   operations: ['LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE'],
 };
 
+function fakeIdGenerator(): () => string {
+  let counter = 0;
+  return () => `local:test-${++counter}`;
+}
+
 function setup() {
-  const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>());
-  const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>());
+  const local = new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>(), fakeIdGenerator());
+  const queue = new SyncQueue(new InMemoryRecordStore<SyncQueueItem>(), fakeIdGenerator());
   const ds = new OfflineFirstDataSource(local, queue);
   return { local, queue, ds };
 }

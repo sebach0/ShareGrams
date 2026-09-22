@@ -33,7 +33,13 @@ export function useOfflineStack(baseUrl: string | null, manifest: DomainManifest
     if (!baseUrl || !manifest) return;
 
     let cancelled = false;
-    createOfflineStack(baseUrl, manifest).then((created) => {
+    createOfflineStack(baseUrl, manifest).then(async (created) => {
+      if (cancelled) return;
+      // Hidratación inicial: si hay conexión al conectar, trae lo que ya
+      // existía en el servidor antes de mostrar la primera pantalla --
+      // si no hay conexión, esto no hace nada (falla en silencio, se
+      // sigue trabajando con lo que ya hubiera en la base local).
+      await created.syncEngine.hydrate();
       if (cancelled) return;
       stackRef.current = created;
       setStack(created);

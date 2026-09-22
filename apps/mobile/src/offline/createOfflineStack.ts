@@ -6,6 +6,7 @@ import { LocalDataSource } from './localDataSource';
 import { SyncQueue, type SyncQueueItem } from './syncQueue';
 import { SyncEngine } from './syncEngine';
 import { OfflineFirstDataSource } from './offlineFirstDataSource';
+import { generateLocalId } from './idGenerator';
 import type { LocalDynamicEntity } from './localDynamicEntity';
 
 export interface OfflineStack {
@@ -26,8 +27,8 @@ export interface OfflineStack {
  */
 export async function createOfflineStack(baseUrl: string, manifest: DomainManifest): Promise<OfflineStack> {
   const db = await getLocalDatabase();
-  const local = new LocalDataSource(new SqliteRecordStore<LocalDynamicEntity>(db, 'local_entities'));
-  const syncQueue = new SyncQueue(new SqliteRecordStore<SyncQueueItem>(db, 'sync_queue'));
+  const local = new LocalDataSource(new SqliteRecordStore<LocalDynamicEntity>(db, 'local_entities'), generateLocalId);
+  const syncQueue = new SyncQueue(new SqliteRecordStore<SyncQueueItem>(db, 'sync_queue'), generateLocalId);
   const remote = new DynamicRepository(baseUrl);
   const syncEngine = new SyncEngine(syncQueue, local, remote, manifest);
   const dataSource = new OfflineFirstDataSource(local, syncQueue);

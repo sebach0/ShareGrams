@@ -16,8 +16,13 @@ const paciente: EntityDefinition = {
   operations: ['LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE'],
 };
 
+function fakeIdGenerator(): () => string {
+  let counter = 0;
+  return () => `local:test-${++counter}`;
+}
+
 function newDataSource() {
-  return new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>());
+  return new LocalDataSource(new InMemoryRecordStore<LocalDynamicEntity>(), fakeIdGenerator());
 }
 
 describe('LocalDataSource.create', () => {

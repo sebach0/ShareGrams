@@ -1,6 +1,5 @@
 import type { DynamicCommand } from '../engine/dynamicCommand';
 import type { KeyValueRecordStore } from './recordStore';
-import { generateLocalId } from './localId';
 
 /** Estados de una operación en la cola (Fase 17, regla 10). */
 export type SyncQueueStatus = 'PENDING' | 'PROCESSING' | 'SYNCED' | 'FAILED' | 'CONFLICT';
@@ -33,11 +32,15 @@ export interface SyncQueueItem {
  * forma de saber a qué id remoto reescribir la relación.
  */
 export class SyncQueue {
-  constructor(private readonly store: KeyValueRecordStore<SyncQueueItem>) {}
+  constructor(
+    private readonly store: KeyValueRecordStore<SyncQueueItem>,
+    /** Inyectado (no importa `expo-crypto` acá) -- ver `idGenerator.ts` para el motivo. */
+    private readonly generateId: () => string,
+  ) {}
 
   async enqueue(entityType: string, localId: string, command: DynamicCommand): Promise<SyncQueueItem> {
     const item: SyncQueueItem = {
-      id: generateLocalId(),
+      id: this.generateId(),
       entityType,
       localId,
       command,

@@ -37,6 +37,30 @@ export class SyncEngine {
     private readonly manifest: DomainManifest,
   ) {}
 
+  /**
+   * Hidratación inicial (regla implícita del checkpoint: al conectar a un
+   * backend, sus registros existentes tienen que verse -- las lecturas
+   * son siempre locales, así que si nunca se trae lo que ya había en el
+   * servidor, la app se ve vacía la primera vez aunque el backend tenga
+   * datos reales). Trae un LIST por entidad y agrega solo lo que todavía
+   * no existe localmente (por `remoteId`) -- nunca pisa un registro con
+   * cambios locales pendientes, nunca borra nada.
+   */
+  async hydrate(): Promise<void> {
+    for (const entity of this.manifest.entities) {
+      if (!entity.operations.includes('LIST')) continue;
+      const result = await this.remote.list(entity);
+      if (result.kind !== 'ok') continue; // sin conexión o error -- se sigue trabajando con lo que ya había local
+      const idField = idFieldName(entity);
+      for (const record of result.value) {
+        const remoteId = record.values[idField] as DynamicId;
+        if (remoteId === undefined) continue;
+        const exists = await this.local.hasRemoteId(entity.name, remoteId);
+        if (!exists) await this.local.insertFromRemote(entity, remoteId, record.values);
+      }
+    }
+  }
+
   async processQueue(): Promise<SyncSummary> {
     const summary: SyncSummary = { synced: 0, conflicts: 0, failed: 0, skipped: 0, stoppedByNetwork: false };
     const pending = await this.queue.listPending();
