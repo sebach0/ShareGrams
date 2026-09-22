@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { generateId } from '@sharegrams/uml-core';
 import { useAssistantInstruction, useIsReadOnly } from '../../realtime/collabContext';
 import { useSpeechRecognition } from '../../realtime/useSpeechRecognition';
 
@@ -34,14 +35,14 @@ export function AssistantChat() {
     const instruction = input.trim();
     if (!instruction || sending) return;
 
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'user', text: instruction }]);
+    setMessages((prev) => [...prev, { id: generateId(), role: 'user', text: instruction }]);
     setInput('');
     setSending(true);
 
     const result = await sendInstruction(instruction);
     setMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'assistant', text: result.message, isError: !result.ok },
+      { id: generateId(), role: 'assistant', text: result.message, isError: !result.ok },
     ]);
     setSending(false);
   };
