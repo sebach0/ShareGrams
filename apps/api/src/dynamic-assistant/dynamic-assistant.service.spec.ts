@@ -163,4 +163,26 @@ describe('DynamicAssistantService', () => {
 
     expect(result).toEqual({ status: 'AI_ERROR', message: expect.any(String) });
   });
+
+  it('incluye los knownRecords en el system prompt, para que Claude pueda resolver un nombre a un id sin preguntar', async () => {
+    createMock.mockResolvedValue(toolUseResponse('create_record', { entity: 'Paciente', data: { nombre: 'Carlos', medicoId: 7 } }));
+
+    await service.interpret('crea un paciente llamado Carlos con el médico Dra. Pérez', clinicaManifest, {
+      Medico: [{ id: 7, label: 'Dra. Pérez' }],
+    });
+
+    const call = createMock.mock.calls[0][0];
+    expect(call.system).toContain('Registros existentes');
+    expect(call.system).toContain('Dra. Pérez');
+    expect(call.system).toContain('id=7');
+  });
+
+  it('sin knownRecords, no agrega la sección al prompt (comportamiento igual al de antes)', async () => {
+    createMock.mockResolvedValue(toolUseResponse('list_records', { entity: 'Paciente' }));
+
+    await service.interpret('muéstrame todos los pacientes', clinicaManifest);
+
+    const call = createMock.mock.calls[0][0];
+    expect(call.system).not.toContain('Registros existentes');
+  });
 });

@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { DomainManifest } from '@sharegrams/uml-core';
 import type { EnvConfig } from '../config/env';
 import { ASK_CLARIFICATION, REPORT_INVALID_REQUEST, REPORT_UNSUPPORTED, actionForToolName, buildDynamicTools } from './dynamic-assistant.tools';
-import type { DynamicAICommandResult } from './dynamic-assistant.types';
+import type { DynamicAICommandResult, KnownRecords } from './dynamic-assistant.types';
 
 const MAX_TOKENS = 512;
 
@@ -33,7 +33,7 @@ export class DynamicAssistantService {
     return this.client;
   }
 
-  async interpret(instruction: string, manifest: DomainManifest): Promise<DynamicAICommandResult> {
+  async interpret(instruction: string, manifest: DomainManifest, knownRecords?: KnownRecords): Promise<DynamicAICommandResult> {
     const client = this.getClient();
     if (!client) {
       this.logger.warn('Se invocó el intérprete dinámico sin ANTHROPIC_API_KEY configurada.');
@@ -47,7 +47,7 @@ export class DynamicAssistantService {
       response = await client.messages.create({
         model: this.config.get('anthropicModel', { infer: true }),
         max_tokens: MAX_TOKENS,
-        system: buildSystemPrompt(manifest),
+        system: buildSystemPrompt(manifest, knownRecords),
         tools,
         tool_choice: { type: 'any' },
         messages: [{ role: 'user', content: instruction }],
@@ -96,23 +96,39 @@ export class DynamicAssistantService {
   }
 }
 
-function buildSystemPrompt(manifest: DomainManifest): string {
+function buildSystemPrompt(manifest: DomainManifest, knownRecords?: KnownRecords): string {
   const entitiesDescription = manifest.entities.map(describeEntity).join('\n\n');
+  const knownRecordsSection = describeKnownRecords(knownRecords);
+  const idResolutionRule = knownRecordsSection
+    ? 'Para GET/UPDATE/DELETE, y para el id de una relación en CREATE/UPDATE, necesitás el id real del registro. Si el usuario lo dio como número, usalo directo. Si el usuario se refiere a un registro por nombre, buscalo en la sección "Registros existentes" de arriba: si aparece un único registro con ese nombre, usá su id sin preguntar nada; si no aparece ningún registro con ese nombre, o hay más de uno igual, usá ask_clarification.'
+    : 'Para GET/UPDATE/DELETE, y para el id de una relación en CREATE/UPDATE, necesitás el id explícito del registro (un número o texto que el usuario haya dado). Si el usuario se refiere a un registro por nombre en vez de por id, usá ask_clarification pidiendo el id.';
 
   return `Sos el intérprete de comandos de "${manifest.application.name}", una app móvil de ShareGrams. Tu única función es traducir UNA instrucción del usuario en UNA llamada a una de las herramientas disponibles -- nunca ejecutás nada vos mismo, nunca generás SQL, URLs ni código.
 
 Entidades disponibles en este backend:
 
 ${entitiesDescription}
-
+${knownRecordsSection}
 Reglas estrictas:
 - Usá EXCLUSIVAMENTE los nombres de entidad y de campo tal como aparecen arriba. Nunca inventes una entidad o campo que no esté en esta lista.
-- Para GET/UPDATE/DELETE necesitás el id explícito del registro (un número o texto que el usuario haya dado). Si el usuario se refiere a un registro por nombre en vez de por id, usá ask_clarification pidiendo el id.
+- ${idResolutionRule}
 - En CREATE/UPDATE, "data" son solo los campos que el usuario mencionó explícitamente. Nunca completes ni inventes valores para campos que no dijo.
 - Si falta información para ejecutar una acción concreta, o hay más de una entidad posible y no está claro cuál, usá ask_clarification.
 - Si la instrucción pide algo sobre una entidad o campo que no existe en la lista de arriba, usá report_invalid_request.
 - Si la instrucción pide algo fuera de tu alcance (una operación masiva, una búsqueda o filtro complejo, o cualquier cosa que no sea una operación puntual sobre una sola entidad), usá report_unsupported.
 - Nunca respondas solo con texto: siempre usá alguna herramienta.`;
+}
+
+function describeKnownRecords(knownRecords: KnownRecords | undefined): string {
+  const entries = knownRecords ? Object.entries(knownRecords).filter(([, records]) => records.length > 0) : [];
+  if (entries.length === 0) return '';
+
+  const lines = entries.map(([entityName, records]) => {
+    const items = records.map((r) => `id=${JSON.stringify(r.id)} (${r.label})`).join(', ');
+    return `  - ${entityName}: ${items}`;
+  });
+
+  return `\nRegistros existentes (usalos para resolver un nombre a un id, nunca inventes uno que no esté acá):\n${lines.join('\n')}\n`;
 }
 
 function describeEntity(entity: DomainManifest['entities'][number]): string {

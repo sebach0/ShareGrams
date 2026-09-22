@@ -16,3 +16,17 @@ export type DynamicAICommandResult =
   | { status: 'INVALID_REQUEST'; message: string }
   | { status: 'AI_ERROR'; message: string }
   | { status: 'NOT_CONFIGURED'; message: string };
+
+/**
+ * Registros YA existentes de una entidad (id + su displayField), que la
+ * app móvil arma consultando el backend generado ANTES de llamar al
+ * intérprete -- este servicio nunca los consulta por su cuenta (no tiene
+ * forma de llegar a la URL del backend generado, que puede ser una
+ * dirección solo válida desde el emulador/dispositivo, ej. 10.0.2.2).
+ * Sin esto, Claude no puede resolver un nombre ("la universidad UMSA") a
+ * un id real dentro de una sola llamada a herramienta -- este intérprete
+ * no encadena LIST->CREATE, todo pasa en un único tool_use por
+ * instrucción. Opcional: si no viene, el comportamiento es el mismo de
+ * antes (siempre pide el id explícito ante una referencia por nombre).
+ */
+export type KnownRecords = Record<string, Array<{ id: unknown; label: string }>>;

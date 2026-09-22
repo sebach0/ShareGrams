@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { interpretInstruction } from '../ai/aiCommandInterpreter';
+import { buildKnownRecords } from '../ai/knownRecords';
 import { coerceAiCommand } from '../ai/coerceAiCommand';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
 import { DynamicRepository } from '../engine/dynamicRepository';
@@ -44,7 +45,9 @@ export function AIChatScreen({ baseUrl, manifest, onBack }: Props) {
     setText('');
     setBusy(true);
 
-    const aiResult = await interpretInstruction(instruction, manifest);
+    const repository = new DynamicRepository(baseUrl);
+    const knownRecords = await buildKnownRecords(manifest, repository);
+    const aiResult = await interpretInstruction(instruction, manifest, fetch, knownRecords);
 
     if (aiResult.status !== 'COMMAND') {
       setEntries((prev) => [...prev, { instruction, status: aiResult.status, message: aiResult.message }]);
@@ -53,7 +56,6 @@ export function AIChatScreen({ baseUrl, manifest, onBack }: Props) {
     }
 
     const coerced = coerceAiCommand(aiResult.command, manifest);
-    const repository = new DynamicRepository(baseUrl);
     const result = await runDynamicCommand(coerced, manifest, repository);
 
     setEntries((prev) => [

@@ -1,4 +1,5 @@
 import type { DomainManifest } from '../domain/manifest';
+import type { KnownRecords } from './knownRecords';
 
 export type AICommandResult =
   | { status: 'COMMAND'; command: Record<string, unknown>; message: string }
@@ -34,13 +35,14 @@ export async function interpretInstruction(
   instruction: string,
   manifest: DomainManifest,
   fetchImpl: typeof fetch = fetch,
+  knownRecords?: KnownRecords,
 ): Promise<AICommandResult> {
   let response: Response;
   try {
     response = await fetchImpl(`${SHAREGRAMS_API_URL}/dynamic-assistant/interpret`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ instruction, manifest }),
+      body: JSON.stringify(knownRecords ? { instruction, manifest, knownRecords } : { instruction, manifest }),
       signal: AbortSignal.timeout(15000),
     });
   } catch {

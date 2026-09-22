@@ -77,4 +77,32 @@ describe('interpretInstruction', () => {
     const result = await interpretInstruction('crea un paciente', manifest, fakeFetch({ jsonBody: { status: 'COMMAND' } }));
     expect(result.status).toBe('AI_ERROR');
   });
+
+  it('sin knownRecords, no lo manda en el body', async () => {
+    let sentBody: unknown;
+    const fetchImpl: typeof fetch = (async (_url: string, init?: RequestInit) => {
+      sentBody = JSON.parse(init!.body as string);
+      return { ok: true, status: 200, json: async () => ({ status: 'CLARIFICATION_REQUIRED', message: 'x' }) } as Response;
+    }) as typeof fetch;
+
+    await interpretInstruction('crea un paciente', manifest, fetchImpl);
+
+    expect(sentBody).toEqual({ instruction: 'crea un paciente', manifest });
+  });
+
+  it('con knownRecords, lo incluye en el body para que el servidor lo use al armar el prompt', async () => {
+    let sentBody: unknown;
+    const fetchImpl: typeof fetch = (async (_url: string, init?: RequestInit) => {
+      sentBody = JSON.parse(init!.body as string);
+      return { ok: true, status: 200, json: async () => ({ status: 'CLARIFICATION_REQUIRED', message: 'x' }) } as Response;
+    }) as typeof fetch;
+
+    await interpretInstruction('crea un paciente con médico Dra. Pérez', manifest, fetchImpl, { Medico: [{ id: 7, label: 'Dra. Pérez' }] });
+
+    expect(sentBody).toEqual({
+      instruction: 'crea un paciente con médico Dra. Pérez',
+      manifest,
+      knownRecords: { Medico: [{ id: 7, label: 'Dra. Pérez' }] },
+    });
+  });
 });

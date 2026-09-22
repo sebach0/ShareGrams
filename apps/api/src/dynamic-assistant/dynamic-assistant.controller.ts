@@ -1,8 +1,8 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { IsObject, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import type { DomainManifest } from '@sharegrams/uml-core';
 import { DynamicAssistantService } from './dynamic-assistant.service';
-import type { DynamicAICommandResult } from './dynamic-assistant.types';
+import type { DynamicAICommandResult, KnownRecords } from './dynamic-assistant.types';
 
 class InterpretDynamicCommandDto {
   @IsString()
@@ -20,6 +20,16 @@ class InterpretDynamicCommandDto {
    */
   @IsObject()
   manifest!: DomainManifest;
+
+  /**
+   * Opcional: registros ya existentes (id + displayField) que la app móvil
+   * consultó ella misma contra el backend generado, para que Claude pueda
+   * resolver un nombre a un id sin tener que preguntarlo. Mismo criterio
+   * que "manifest": no se valida en profundidad, nunca se ejecuta.
+   */
+  @IsObject()
+  @IsOptional()
+  knownRecords?: KnownRecords;
 }
 
 /**
@@ -35,6 +45,6 @@ export class DynamicAssistantController {
 
   @Post('interpret')
   async interpret(@Body() dto: InterpretDynamicCommandDto): Promise<DynamicAICommandResult> {
-    return this.service.interpret(dto.instruction, dto.manifest);
+    return this.service.interpret(dto.instruction, dto.manifest, dto.knownRecords);
   }
 }
