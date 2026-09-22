@@ -88,6 +88,10 @@ export const expoSpeechRecognitionProvider: SpeechRecognitionProvider = {
       interimResults: false,
       continuous: false,
       maxAlternatives: 1,
+      // El default de Android corta apenas detecta un silencio corto --
+      // le damos más margen para que una pausa natural al pensar la
+      // instrucción no trunque la frase (hallazgo real de uso en vivo).
+      androidIntentOptions: { EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000 },
     });
 
     return {

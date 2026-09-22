@@ -141,6 +141,34 @@ describe('SpeechToTextService.listen', () => {
     expect(cancel).toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  it('una vez que empieza a hablar, extiende el timeout -- no corta una frase larga a la mitad (bug real encontrado en uso en vivo)', async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    let capturedCallbacks: SpeechRecognitionCallbacks | undefined;
+    const provider = fakeProvider({
+      startListening: vi.fn((_opts, callbacks: SpeechRecognitionCallbacks): SpeechRecognitionSession => {
+        capturedCallbacks = callbacks;
+        return { stop: vi.fn(), cancel };
+      }),
+    });
+    // timeoutMs corto (5s) para "esperando que arranque"; speechInProgressTimeoutMs largo (20s) una vez que ya habló.
+    const service = new SpeechToTextService(provider, 5000, 20000);
+
+    const pending = service.listen('es-419');
+    await vi.advanceTimersByTimeAsync(4000);
+    capturedCallbacks?.onSpeechStart?.(); // habla justo antes de que venza el timeout corto
+
+    // Pasan otros 8s (más que el timeout corto de 5s, pero mucho menos que el largo de 20s) sin resultado todavía -- no debería cortarse.
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(cancel).not.toHaveBeenCalled();
+
+    // Recién entrega el resultado más tarde (frase larga con pausas) -- se resuelve normal, no por timeout.
+    capturedCallbacks?.onResult({ text: 'Creá un estudiante llamado Juan Pérez de la materia de base de datos 2', confidence: 0.9, language: 'es-419' });
+    await expect(pending).resolves.toEqual({ text: 'Creá un estudiante llamado Juan Pérez de la materia de base de datos 2', confidence: 0.9, language: 'es-419' });
+
+    vi.useRealTimers();
+  });
 });
 
 describe('SpeechToTextService.cancel', () => {
