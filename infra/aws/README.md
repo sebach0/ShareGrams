@@ -107,12 +107,43 @@ Después de la primera vez, un deploy nuevo es un solo comando desde `/home/ec2-
 VITE_API_URL=http://<IP-PUBLICA-EC2>:3000 ./infra/aws/deploy.sh
 ```
 
+## HTTPS (sslip.io + Certbot, ya configurado)
+
+El micrófono del asistente de voz (Fase 6) -- y, en general, cualquier API de navegador que exija un "contexto seguro" -- no funciona en HTTP plano (solo HTTPS o `localhost`). Sin dominio propio para este proyecto académico, se usó **sslip.io**: un servicio gratuito que resuelve `<IP-con-guiones>.sslip.io` a esa misma IP (ej. `34-207-109-145.sslip.io` → `34.207.109.145`), así que Let's Encrypt sí le puede emitir un certificado válido -- a una IP pelada no puede.
+
+```bash
+sudo dnf install -y certbot
+
+# El :80 de nginx.conf ya sirve /var/www/sharegrams/web -- certbot valida el
+# dominio dejando un archivo ahí y pidiéndolo por HTTP plano.
+sudo certbot certonly --webroot -w /var/www/sharegrams/web \
+  -d <IP-con-guiones>.sslip.io \
+  --non-interactive --agree-tos -m tu-email@ejemplo.com
+
+sudo cp infra/aws/nginx.conf /etc/nginx/conf.d/sharegrams.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+`nginx.conf` ya trae los tres bloques: `:80` (redirect a https, salvo el path de validación de Certbot), `:443` (el editor web) y `:3443` (reverse proxy TLS hacia la API en `:3000`, en puerto separado por la misma razón por la que la API ya vivía en un puerto aparte en HTTP -- ver el comentario del archivo). Hace falta abrir `443` y `3443` en el security group de la EC2 (`sharegrams-ec2-sg`), además de los que ya estaban.
+
+A partir de acá, todo deploy usa las URLs HTTPS:
+
+```bash
+VITE_API_URL=https://<IP-con-guiones>.sslip.io:3443 ./infra/aws/deploy.sh
+```
+
+El certificado de Let's Encrypt vence a los 90 días. Renovación manual (no hay cronjob configurado todavía):
+
+```bash
+sudo certbot renew && sudo systemctl reload nginx
+```
+
 ## Conectar la app móvil (Fase 12) a este backend
 
 Una vez desplegado un backend GENERADO (no ShareGrams en sí, sino uno que generaste con "⚙ Generar Backend" y corriste en tu propia infraestructura), la app móvil se conecta igual que en local: `http://<esa-IP-o-dominio>:<puerto>`. Si también querés desplegar un backend generado en AWS, es el mismo patrón EC2+RDS de esta guía, en una instancia aparte.
 
 ## Limitaciones de este setup (a propósito, para no sobre-complicar)
 
-- Sin HTTPS (no hay certificado ni dominio propio configurado). Para eso hace falta un dominio + Certbot/ACM, es un paso aparte si lo necesitás.
+- HTTPS via sslip.io + Certbot (ver sección HTTPS más arriba) en vez de un dominio propio + ACM -- suficiente para un proyecto académico, pero el certificado hay que renovarlo a mano cada 90 días (no hay cronjob).
 - Un solo servidor, sin autoescalado ni balanceo — de sobra para una demo/entrega académica, no para producción real.
 - El backend queda expuesto directo en el puerto 3000 sin nginx en el medio (ver comentario en `nginx.conf`) — funciona porque CORS ya está permisivo (`origin: '*'`) en `apps/api`.
