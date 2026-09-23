@@ -2,6 +2,7 @@ import { Handle, Position as HandlePosition, useConnection } from '@xyflow/react
 import type { CSSProperties } from 'react';
 import type { Node, NodeProps } from '@xyflow/react';
 import type { UMLClass } from '@sharegrams/uml-core';
+import { primitiveTypeLabel } from '../../uml/primitiveTypeLabel';
 
 export type ClassNodeType = Node<{ umlClass: UMLClass }, 'umlClass'>;
 
@@ -81,7 +82,7 @@ export function ClassNode({ data, selected }: NodeProps<ClassNodeType>) {
         ) : (
           umlClass.attributes.map((attribute) => (
             <div key={attribute.id} className="uml-class-node__attribute">
-              {attribute.name}: {attribute.type}
+              {attribute.name}: {primitiveTypeLabel(attribute.type)}
             </div>
           ))
         )}

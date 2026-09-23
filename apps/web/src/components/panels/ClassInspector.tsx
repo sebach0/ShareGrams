@@ -3,6 +3,7 @@ import { generateId, PRIMITIVE_TYPES } from '@sharegrams/uml-core';
 import type { PrimitiveType, UMLAttribute } from '@sharegrams/uml-core';
 import { useUmlStore } from '../../store/useUmlStore';
 import { useCollabDispatch, useIsReadOnly } from '../../realtime/collabContext';
+import { primitiveTypeLabel } from '../../uml/primitiveTypeLabel';
 
 interface ClassInspectorProps {
   classId: string;
@@ -65,7 +66,7 @@ function AttributeRow({ classId, attribute, onTogglePrimaryKey }: AttributeRowPr
       >
         {PRIMITIVE_TYPES.map((t) => (
           <option key={t} value={t}>
-            {t}
+            {primitiveTypeLabel(t)}
           </option>
         ))}
       </select>
@@ -182,7 +183,7 @@ export function ClassInspector({ classId }: ClassInspectorProps) {
         >
           {PRIMITIVE_TYPES.map((t) => (
             <option key={t} value={t}>
-              {t}
+              {primitiveTypeLabel(t)}
             </option>
           ))}
         </select>
