@@ -70,9 +70,27 @@ export default function App() {
             <ActivityIndicator style={styles.loading} />
           )
         ) : state.status === 'connected' && view.kind === 'console' ? (
-          <CommandConsoleScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
+          offline.stack ? (
+            <CommandConsoleScreen
+              dataSource={offline.stack.dataSource}
+              baseUrl={state.url}
+              manifest={state.manifest}
+              onBack={() => setView({ kind: 'discovery' })}
+            />
+          ) : (
+            <ActivityIndicator style={styles.loading} />
+          )
         ) : state.status === 'connected' && view.kind === 'assistant' ? (
-          <AIChatScreen baseUrl={state.url} manifest={state.manifest} onBack={() => setView({ kind: 'discovery' })} />
+          offline.stack ? (
+            <AIChatScreen
+              dataSource={offline.stack.dataSource}
+              baseUrl={state.url}
+              manifest={state.manifest}
+              onBack={() => setView({ kind: 'discovery' })}
+            />
+          ) : (
+            <ActivityIndicator style={styles.loading} />
+          )
         ) : state.status === 'connected' ? (
           <DiscoveryScreen
             url={state.url}

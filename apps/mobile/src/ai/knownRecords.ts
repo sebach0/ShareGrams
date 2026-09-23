@@ -1,5 +1,5 @@
 import type { DomainManifest } from '../domain/manifest';
-import type { DynamicRepository } from '../engine/dynamicRepository';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 export type KnownRecords = Record<string, Array<{ id: unknown; label: string }>>;
 
@@ -20,7 +20,7 @@ const MAX_RECORDS_PER_ENTITY = 20;
  * MAX_RECORDS_PER_ENTITY por entidad: para el tamaño de un proyecto
  * académico sobra, y evita un prompt gigante si alguien cargó muchas filas.
  */
-export async function buildKnownRecords(manifest: DomainManifest, repository: DynamicRepository): Promise<KnownRecords> {
+export async function buildKnownRecords(manifest: DomainManifest, repository: DynamicDataSource): Promise<KnownRecords> {
   const targetEntityNames = new Set(manifest.entities.flatMap((e) => e.relations.map((r) => r.targetEntity)));
   const relevantEntities = manifest.entities.filter((e) => targetEntityNames.has(e.name) && e.id && e.operations.includes('LIST'));
 

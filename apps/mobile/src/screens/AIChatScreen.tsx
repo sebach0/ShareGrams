@@ -4,12 +4,13 @@ import { interpretInstruction } from '../ai/aiCommandInterpreter';
 import { buildKnownRecords } from '../ai/knownRecords';
 import { coerceAiCommand } from '../ai/coerceAiCommand';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
-import { DynamicRepository } from '../engine/dynamicRepository';
 import { useSpeechToText } from '../speech/useSpeechToText';
 import type { CommandResult } from '../engine/commandResult';
 import type { DomainManifest } from '../domain/manifest';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 interface Props {
+  dataSource: DynamicDataSource;
   baseUrl: string;
   manifest: DomainManifest;
   onBack: () => void;
@@ -38,7 +39,7 @@ const LOW_CONFIDENCE_THRESHOLD = 0.6;
  * pasa por exactamente el mismo runDynamicCommand que usa el formulario y
  * la consola de comandos manual.
  */
-export function AIChatScreen({ baseUrl, manifest, onBack }: Props) {
+export function AIChatScreen({ dataSource, baseUrl, manifest, onBack }: Props) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -68,8 +69,7 @@ export function AIChatScreen({ baseUrl, manifest, onBack }: Props) {
     setLowConfidenceNotice(null);
     setBusy(true);
 
-    const repository = new DynamicRepository(baseUrl);
-    const knownRecords = await buildKnownRecords(manifest, repository);
+    const knownRecords = await buildKnownRecords(manifest, dataSource);
     const aiResult = await interpretInstruction(instruction, manifest, fetch, knownRecords);
 
     if (aiResult.status !== 'COMMAND') {
@@ -85,7 +85,7 @@ export function AIChatScreen({ baseUrl, manifest, onBack }: Props) {
     }
 
     const coerced = coerceAiCommand(aiResult.command, manifest);
-    const result = await runDynamicCommand(coerced, manifest, repository);
+    const result = await runDynamicCommand(coerced, manifest, dataSource);
 
     setEntries((prev) => [
       ...prev,

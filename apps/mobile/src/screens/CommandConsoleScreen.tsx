@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { runDynamicCommand } from '../engine/runDynamicCommand';
-import { DynamicRepository } from '../engine/dynamicRepository';
 import type { CommandResult } from '../engine/commandResult';
 import type { DomainManifest } from '../domain/manifest';
+import type { DynamicDataSource } from '../offline/dynamicDataSource';
 
 interface Props {
+  dataSource: DynamicDataSource;
   baseUrl: string;
   manifest: DomainManifest;
   onBack: () => void;
@@ -25,7 +26,7 @@ const PLACEHOLDER = `{
  * automatizados (commandValidator.test.ts, dynamicRepository.test.ts,
  * runDynamicCommand.test.ts) contra un backend real.
  */
-export function CommandConsoleScreen({ baseUrl, manifest, onBack }: Props) {
+export function CommandConsoleScreen({ dataSource, baseUrl, manifest, onBack }: Props) {
   const [text, setText] = useState('');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<CommandResult | { status: 'PARSE_ERROR'; message: string } | null>(null);
@@ -41,8 +42,7 @@ export function CommandConsoleScreen({ baseUrl, manifest, onBack }: Props) {
     }
 
     setRunning(true);
-    const repository = new DynamicRepository(baseUrl);
-    const commandResult = await runDynamicCommand(parsed, manifest, repository);
+    const commandResult = await runDynamicCommand(parsed, manifest, dataSource);
     setRunning(false);
     setResult(commandResult);
   };
