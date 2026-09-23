@@ -5,8 +5,15 @@ import type { SpeechRecognitionResult } from './speechRecognitionProvider';
 
 export type SpeechToTextState = 'idle' | 'listening' | 'processing' | 'success' | 'error';
 
-/** es-419 = español latinoamericano genérico -- mismo idioma por defecto que ya usa el hook de voz de la Fase 6 en apps/web. */
-export const DEFAULT_SPEECH_LANGUAGE = 'es-419';
+// "es-419" (español latinoamericano genérico) no es un locale confiable
+// para el reconocimiento de voz nativo de Android: en algunos dispositivos
+// (confirmado en un Xiaomi/MIUI) el SpeechRecognizer arranca a escuchar
+// pero nunca devuelve resultado ni error -- el timeout propio de
+// SpeechToTextService es lo único que corta la espera. Mismo síntoma y
+// misma causa que ya se encontró y arregló en apps/web (useSpeechRecognition,
+// Fase 6): "es-419" no está en la lista de locales que el motor soporta de
+// forma confiable. "es-BO" sí.
+export const DEFAULT_SPEECH_LANGUAGE = 'es-BO';
 
 /**
  * Hook de React para la UI (equivalente mobile de `useSpeechRecognition`
