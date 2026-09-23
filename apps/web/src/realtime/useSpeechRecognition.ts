@@ -49,7 +49,12 @@ export function describeSpeechError(code: string): string {
   }
 }
 
-const DEFAULT_LANG = 'es-419';
+// "es-419" (español latinoamericano genérico) no está en la lista de idiomas
+// que el reconocimiento de voz de Chrome/Edge soporta de forma confiable --
+// en vez de devolver un error claro de idioma no soportado, el navegador lo
+// reporta como error de "network", indistinguible en la UI de un problema
+// real de conectividad. "es-BO" sí es un locale soportado.
+const DEFAULT_LANG = 'es-BO';
 
 export interface UseSpeechRecognitionOptions {
   /** Se llama con el texto transcripto cuando el reconocimiento termina. No manda nada por sí solo: quien use el hook decide qué hacer con el texto. */
